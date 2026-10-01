@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clinic Front Desk</title>
+  <title>Clinic Front Desk & Chair Recovery</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 16px; }
-    .card { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; max-width: 600px; margin-left: auto; margin-right: auto; }
-    h2 { font-size: 1.15rem; margin-top: 0; color: #0f172a; }
-    input, button { width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; max-width: 650px; margin-left: auto; margin-right: auto; }
+    h2 { font-size: 1.15rem; margin-top: 0; color: #0f172a; display: flex; justify-content: space-between; align-items: center; }
+    input, button, select { width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
     button.submit-btn { background: #0284c7; color: white; border: none; font-weight: 600; cursor: pointer; margin-top: 14px; }
     button.submit-btn:hover { background: #0369a1; }
     .patient-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding: 12px 0; }
@@ -16,32 +16,49 @@
     .CONFIRMED { background: #dcfce7; color: #166534; }
     .BOOKED { background: #fef3c7; color: #92400e; }
     .CANCELLED { background: #fee2e2; color: #991b1b; }
+    .RESCHEDULE_REQUESTED { background: #ffedd5; color: #9a3412; }
     .ARRIVED { background: #e0f2fe; color: #075985; }
     .NO_SHOW { background: #f1f5f9; color: #475569; }
     .actions { display: flex; gap: 6px; margin-top: 6px; }
     .actions button { padding: 6px 10px; font-size: 0.8rem; border: none; border-radius: 6px; cursor: pointer; }
     .btn-arrive { background: #0284c7; color: white; }
     .btn-noshow { background: #64748b; color: white; }
+    .toggle-bar { display: flex; gap: 10px; margin-bottom: 12px; }
+    .toggle-bar button { padding: 8px; font-size: 0.9rem; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+    .toggle-bar button.active { background: #0284c7; color: white; border-color: #0284c7; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>⚡ Quick Add Appointment</h2>
+    <div class="toggle-bar">
+      <button class="active" id="tabAppt" onclick="switchTab('appt')">Book Appointment</button>
+      <button id="tabWait" onclick="switchTab('wait')">+ Chair-Recovery Waitlist</button>
+    </div>
+
     <form id="addForm">
       <input type="text" id="patientName" placeholder="Patient Name" required>
       <input type="tel" id="patientPhone" placeholder="Mobile Number (e.g. 9847012345)" required>
       <input type="text" id="doctorName" value="Dr. Kurian" required>
       <input type="datetime-local" id="appointmentTime" required>
-      <button type="submit" class="submit-btn">+ Save & Schedule Reminders</button>
+      <button type="submit" class="submit-btn" id="submitBtn">+ Save & Schedule Reminders</button>
     </form>
   </div>
 
   <div class="card">
-    <h2>📅 Today's Live Board</h2>
+    <h2>📅 Today's Live Board <small style="font-size:0.8rem; font-weight:normal; color:#64748b;">(Auto-refreshes every 10s)</small></h2>
     <div id="board">Loading today's schedule...</div>
   </div>
 
   <script>
+    let currentMode = 'appt';
+
+    function switchTab(mode) {
+      currentMode = mode;
+      document.getElementById('tabAppt').classList.toggle('active', mode === 'appt');
+      document.getElementById('tabWait').classList.toggle('active', mode === 'wait');
+      document.getElementById('submitBtn').innerText = mode === 'appt' ? '+ Save & Schedule Reminders' : '+ Add to Recovery Waitlist';
+    }
+
     async function loadBoard() {
       try {
         const res = await fetch('/api/appointments/today');
@@ -78,24 +95,28 @@
 
     document.getElementById('addForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const endpoint = currentMode === 'appt' ? '/api/appointments' : '/api/waitlist';
       const payload = {
         patient_name: document.getElementById('patientName').value,
         patient_phone: document.getElementById('patientPhone').value,
         doctor_name: document.getElementById('doctorName').value,
-        appointment_time: document.getElementById('appointmentTime').value
+        preferred_doctor: document.getElementById('doctorName').value,
+        appointment_time: document.getElementById('appointmentTime').value,
+        preferred_date: document.getElementById('appointmentTime').value
       };
-      await fetch('/api/appointments', {
+      await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       document.getElementById('patientName').value = '';
       document.getElementById('patientPhone').value = '';
-      loadBoard();
+      if(currentMode === 'appt') loadBoard();
+      else alert("Patient added to waitlist. When someone cancels with " + payload.doctor_name + ", this patient will be prioritized!");
     });
 
     loadBoard();
-    setInterval(loadBoard, 15000);
+    setInterval(loadBoard, 10000);
   </script>
 </body>
 </html>

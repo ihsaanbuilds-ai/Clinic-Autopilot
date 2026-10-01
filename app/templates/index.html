@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinic Front Desk & Chair Recovery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .card { border-radius: 12px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .badge-BOOKED { background-color: #e2e8f0; color: #475569; }
+    .badge-CONFIRMED { background-color: #dcfce7; color: #15803d; }
+    .badge-ARRIVED { background-color: #dbeafe; color: #1d4ed8; }
+    .badge-NO_SHOW { background-color: #fee2e2; color: #b91c1c; }
+    .badge-CANCELLED { background-color: #f3f4f6; color: #6b7280; text-decoration: line-through; }
+  </style>
+</head>
+<body class="py-4">
+  <div class="container" style="max-width: 760px;">
+    
+    <div class="card p-4 mb-4">
+      <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+        <li class="nav-item flex-fill text-center">
+          <button class="nav-link active w-100" id="book-tab" data-bs-toggle="pill" data-bs-target="#tab-book">Book Appointment</button>
+        </li>
+        <li class="nav-item flex-fill text-center">
+          <button class="nav-link w-100" id="waitlist-tab" data-bs-toggle="pill" data-bs-target="#tab-waitlist">+ Chair-Recovery Waitlist</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-book">
+          <form id="apptForm">
+            <input type="text" id="patient_name" class="form-control mb-2" placeholder="Patient Name" required>
+            <input type="tel" id="patient_phone" class="form-control mb-2" placeholder="Mobile Number (e.g. 9847012345)" required>
+            <input type="text" id="doctor_name" class="form-control mb-2" value="Dr. Kurian" required>
+            <input type="datetime-local" id="appointment_time" class="form-control mb-3" required>
+            <button type="submit" class="btn btn-primary w-100 py-2">+ Save & Schedule Reminders</button>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="tab-waitlist">
+          <form id="waitlistForm">
+            <input type="text" id="wl_name" class="form-control mb-2" placeholder="Flexible Patient Name" required>
+            <input type="tel" id="wl_phone" class="form-control mb-2" placeholder="WhatsApp Number" required>
+            <input type="text" id="wl_doctor" class="form-control mb-3" value="Dr. Kurian">
+            <button type="submit" class="btn btn-warning w-100 py-2">+ Add to Chair-Recovery Waitlist</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">📅 Today's Live Board</h5>
+        <small class="text-muted">(Auto-refreshes every 5s)</small>
+      </div>
+      <div id="boardList">Loading appointments...</div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    async function fetchAppointments() {
+      try {
+        const res = await fetch('/api/appointments/today');
+        const data = await res.json();
+        const container = document.getElementById('boardList');
+        if (!data.length) {
+          container.innerHTML = '<p class="text-muted mb-0">No appointments scheduled for today.</p>';
+          return;
+        }
+        container.innerHTML = data.map(a => {
+          const t = new Date(a.appointment_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          return `
+            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+              <div>
+                <strong>${t}</strong> - ${a.patient_name}
+                <div class="small text-muted">${a.patient_phone} • ${a.doctor_name}</div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge badge-${a.status} px-2 py-1">${a.status}</span>
+                <button class="btn btn-sm btn-outline-primary" onclick="setStatus(${a.id}, 'ARRIVED')">Arrived</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="setStatus(${a.id}, 'NO_SHOW')">No-Show</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function setStatus(id, st) {
+      await fetch(`/api/appointments/${id}/status?new_status=${st}`, {method: 'PATCH'});
+      fetchAppointments();
+    }
+
+    document.getElementById('apptForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          patient_name: document.getElementById('patient_name').value,
+          patient_phone: document.getElementById('patient_phone').value,
+          doctor_name: document.getElementById('doctor_name').value,
+          appointment_time: document.getElementById('appointment_time').value
+        })
+      });
+      e.target.reset();
+      fetchAppointments();
+    });
+
+    document.getElementById('waitlistForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          patient_name: document.getElementById('wl_name').value,
+          patient_phone: document.getElementById('wl_phone').value,
+          preferred_doctor: document.getElementById('wl_doctor').value
+        })
+      });
+      alert('Patient added to recovery waitlist!');
+      e.target.reset();
+    });
+
+    setInterval(fetchAppointments, 5000);
+    fetchAppointments();
+  </script>
+</body>
+</html>
