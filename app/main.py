@@ -1,3 +1,4 @@
+from app.voice_router import voice_router
 import os
 from datetime import datetime, date
 from typing import Optional
@@ -17,7 +18,8 @@ from app.scheduler import start_scheduler
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Clinic Autopilot")
+app = FastAPI(
+title="Clinic Autopilot")
 
 app.add_middleware(
     CORSMiddleware,
@@ -191,3 +193,5 @@ def index():
             return f.read()
     except Exception:
         return "<h3>Dashboard template loading... Ensure app/templates/index.html exists.</h3>"
+
+app.include_router(voice_router)
