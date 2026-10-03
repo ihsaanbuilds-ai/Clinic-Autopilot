@@ -5,3 +5,10 @@ __pycache__/
 .env
 clinic.db
 *.log
+.env
+__pycache__/
+*.pyc
+venv/
+clinic.db
+clinic.db.bak*
+.DS_Store

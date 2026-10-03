@@ -1,45 +1,27 @@
-from datetime import datetime, timedelta
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from app.database import SessionLocal
-from app.models import Appointment
-from app.sender import send_whatsapp_reminder
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.reminders import dispatch_day_before_reminders
+from app.doctor_router import trigger_doctor_briefing
+import logging
 
-scheduler = AsyncIOScheduler()
+logger = logging.getLogger("clinic_scheduler")
+scheduler = BackgroundScheduler()
 
-async def poll_and_send_reminders():
-    db = SessionLocal()
-    now = datetime.now()
-    try:
-        window_start = now + timedelta(hours=23, minutes=30)
-        window_end = now + timedelta(hours=25)
+def daily_morning_briefing_job():
+    logger.info("Triggering doctor morning daily briefing...")
+    trigger_doctor_briefing()
 
-        upcoming_24h = db.query(Appointment).filter(
-            Appointment.appointment_time >= window_start,
-            Appointment.appointment_time <= window_end,
-            Appointment.status == "BOOKED",
-            Appointment.reminder_24h_sent == False,
-            Appointment.opt_out == False
-        ).all()
-
-        for appt in upcoming_24h:
-            success = await send_whatsapp_reminder(
-                appt.patient_phone,
-                appt.patient_name,
-                appt.doctor_name,
-                appt.appointment_time
-            )
-            if success:
-                appt.reminder_24h_sent = True
-                db.commit()
-                print(f"⏰ [24h REMINDER] Sent to {appt.patient_name} ({appt.patient_phone})")
-
-    except Exception as e:
-        print(f"[SCHEDULER ERROR] {e}")
-    finally:
-        db.close()
+def daily_evening_reminders_job():
+    logger.info("Triggering automated patient day-before reminders...")
+    dispatch_day_before_reminders()
 
 def start_scheduler():
-    if not scheduler.running:
-        scheduler.add_job(poll_and_send_reminders, 'interval', minutes=1)
-        scheduler.start()
-        print("🕒 [SCHEDULER ACTIVE] Checking appointments every 60 seconds.")
+    # Morning briefing to Dr. Kurian at 08:00 daily
+    scheduler.add_job(daily_morning_briefing_job, "cron", hour=8, minute=0, id="doctor_briefing")
+    # Evening appointment reminders to patients at 18:00 daily
+    scheduler.add_job(daily_evening_reminders_job, "cron", hour=18, minute=0, id="patient_reminders")
+    scheduler.start()
+    logger.info("Scheduler initialized with morning briefing and evening reminder jobs.")
+
+def shutdown_scheduler():
+    if scheduler.running:
+        scheduler.shutdown()

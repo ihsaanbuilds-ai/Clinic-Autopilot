@@ -2,121 +2,210 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>Dr. Kurian's Clinic - Staff Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clinic Front Desk & Chair Recovery</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 16px; }
-    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; max-width: 650px; margin-left: auto; margin-right: auto; }
-    h2 { font-size: 1.15rem; margin-top: 0; color: #0f172a; display: flex; justify-content: space-between; align-items: center; }
-    input, button, select { width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
-    button.submit-btn { background: #0284c7; color: white; border: none; font-weight: 600; cursor: pointer; margin-top: 14px; }
-    button.submit-btn:hover { background: #0369a1; }
-    .patient-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding: 12px 0; }
-    .badge { padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; }
-    .CONFIRMED { background: #dcfce7; color: #166534; }
-    .BOOKED { background: #fef3c7; color: #92400e; }
-    .CANCELLED { background: #fee2e2; color: #991b1b; }
-    .RESCHEDULE_REQUESTED { background: #ffedd5; color: #9a3412; }
-    .ARRIVED { background: #e0f2fe; color: #075985; }
-    .NO_SHOW { background: #f1f5f9; color: #475569; }
-    .actions { display: flex; gap: 6px; margin-top: 6px; }
-    .actions button { padding: 6px 10px; font-size: 0.8rem; border: none; border-radius: 6px; cursor: pointer; }
-    .btn-arrive { background: #0284c7; color: white; }
-    .btn-noshow { background: #64748b; color: white; }
-    .toggle-bar { display: flex; gap: 10px; margin-bottom: 12px; }
-    .toggle-bar button { padding: 8px; font-size: 0.9rem; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
-    .toggle-bar button.active { background: #0284c7; color: white; border-color: #0284c7; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="card">
-    <div class="toggle-bar">
-      <button class="active" id="tabAppt" onclick="switchTab('appt')">Book Appointment</button>
-      <button id="tabWait" onclick="switchTab('wait')">+ Chair-Recovery Waitlist</button>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <header class="bg-indigo-700 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">🏥 Dr. Kurian's Medical Clinic</h1>
+        <p class="text-sm text-indigo-200">Receptionist AI & Operations Dashboard</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <label for="date-select" class="text-sm font-medium">Select Date:</label>
+        <input type="date" id="date-select" class="text-slate-800 px-3 py-1.5 rounded-md border border-indigo-300 font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+        <button onclick="loadDashboard()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold transition">Refresh</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <!-- Status Banner for Blocked Dates -->
+    <div id="block-banner" class="hidden bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-md">
+      <div class="flex items-center">
+        <span class="text-amber-800 font-semibold" id="block-reason"></span>
+      </div>
     </div>
 
-    <form id="addForm">
-      <input type="text" id="patientName" placeholder="Patient Name" required>
-      <input type="tel" id="patientPhone" placeholder="Mobile Number (e.g. 9847012345)" required>
-      <input type="text" id="doctorName" value="Dr. Kurian" required>
-      <input type="datetime-local" id="appointmentTime" required>
-      <button type="submit" class="submit-btn" id="submitBtn">+ Save & Schedule Reminders</button>
-    </form>
-  </div>
+    <!-- Summary Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Confirmed Bookings</h3>
+        <p class="text-3xl font-extrabold text-emerald-600 mt-2" id="metric-confirmed">0</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Waitlist Queue</h3>
+        <p class="text-3xl font-extrabold text-indigo-600 mt-2" id="metric-waitlist">0</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Cancellations</h3>
+        <p class="text-3xl font-extrabold text-rose-500 mt-2" id="metric-cancelled">0</p>
+      </div>
+    </div>
 
-  <div class="card">
-    <h2>📅 Today's Live Board <small style="font-size:0.8rem; font-weight:normal; color:#64748b;">(Auto-refreshes every 10s)</small></h2>
-    <div id="board">Loading today's schedule...</div>
-  </div>
+    <!-- Schedule Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Confirmed & Active Appointments -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-slate-800">📋 Daily Appointments</h2>
+          <button onclick="blockCurrentDate()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold border border-rose-200 px-3 py-1.5 rounded-md transition">Block This Date</button>
+        </div>
+        <div class="overflow-x-auto flex-1">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-600">
+                <th class="py-2.5 px-3 text-left font-semibold">Time</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Phone</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Status</th>
+                <th class="py-2.5 px-3 text-right font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody id="appointments-tbody" class="divide-y divide-slate-100 text-slate-700">
+              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading appointments...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Priority Waitlist Queue -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-slate-800">⏳ Priority Waitlist</h2>
+          <span class="text-xs text-slate-500 font-medium">Automatic backfill on cancel</span>
+        </div>
+        <div class="overflow-x-auto flex-1">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-600">
+                <th class="py-2.5 px-3 text-left font-semibold">ID</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Pref. Time</th>
+                <th class="py-2.5 px-3 text-left font-semibold">Status</th>
+                <th class="py-2.5 px-3 text-right font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody id="waitlist-tbody" class="divide-y divide-slate-100 text-slate-700">
+              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading waitlist...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
 
   <script>
-    let currentMode = 'appt';
+    // Set default date to today in YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date-select').value = today;
 
-    function switchTab(mode) {
-      currentMode = mode;
-      document.getElementById('tabAppt').classList.toggle('active', mode === 'appt');
-      document.getElementById('tabWait').classList.toggle('active', mode === 'wait');
-      document.getElementById('submitBtn').innerText = mode === 'appt' ? '+ Save & Schedule Reminders' : '+ Add to Recovery Waitlist';
-    }
-
-    async function loadBoard() {
+    async function loadDashboard() {
+      const selectedDate = document.getElementById('date-select').value;
       try {
-        const res = await fetch('/api/appointments/today');
+        const res = await fetch(`/api/dashboard/metrics?target_date=${selectedDate}`);
         const data = await res.json();
-        const board = document.getElementById('board');
-        if (data.length === 0) {
-          board.innerHTML = "<p style='color:#64748b; font-size:0.9rem;'>No appointments booked for today.</p>";
-          return;
+
+        // Update metrics
+        document.getElementById('metric-confirmed').innerText = data.summary.confirmed;
+        document.getElementById('metric-waitlist').innerText = data.summary.waitlisted;
+        document.getElementById('metric-cancelled').innerText = data.summary.cancelled;
+
+        // Block banner
+        const banner = document.getElementById('block-banner');
+        if (data.is_blocked) {
+          banner.classList.remove('hidden');
+          document.getElementById('block-reason').innerText = `⚠ Notice: ${data.block_reason}`;
+        } else {
+          banner.classList.add('hidden');
         }
-        board.innerHTML = data.map(item => `
-          <div class="patient-row">
-            <div>
-              <strong>${item.time}</strong> - ${item.patient_name}<br>
-              <small style="color:#64748b;">${item.patient_phone} • ${item.doctor_name}</small>
-            </div>
-            <div style="text-align: right;">
-              <span class="badge ${item.status}">${item.status}</span>
-              <div class="actions">
-                <button class="btn-arrive" onclick="setStatus(${item.id}, 'ARRIVED')">Arrived</button>
-                <button class="btn-noshow" onclick="setStatus(${item.id}, 'NO_SHOW')">No-Show</button>
-              </div>
-            </div>
-          </div>
-        `).join('');
+
+        // Render appointments
+        const apptTbody = document.getElementById('appointments-tbody');
+        if (data.appointments.length === 0) {
+          apptTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No appointments scheduled for this date.</td></tr>';
+        } else {
+          apptTbody.innerHTML = data.appointments.map(a => {
+            const timeStr = a.appointment_time.split(' ')[1] ? a.appointment_time.split(' ')[1].substring(0, 5) : a.appointment_time;
+            const isConfirmed = a.status === 'confirmed';
+            return `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="py-2.5 px-3 font-semibold text-slate-900">${timeStr}</td>
+                <td class="py-2.5 px-3 font-medium">${a.patient_name}</td>
+                <td class="py-2.5 px-3 text-slate-500">${a.patient_phone}</td>
+                <td class="py-2.5 px-3">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isConfirmed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                    ${a.status}
+                  </span>
+                </td>
+                <td class="py-2.5 px-3 text-right">
+                  ${isConfirmed ? `<button onclick="cancelAppt(${a.id})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold hover:underline">Cancel</button>` : '-'}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Render waitlist
+        const wlTbody = document.getElementById('waitlist-tbody');
+        if (data.waitlist.length === 0) {
+          wlTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">Waitlist is currently clear.</td></tr>';
+        } else {
+          wlTbody.innerHTML = data.waitlist.map(w => {
+            const isWaiting = w.status === 'waiting';
+            return `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="py-2.5 px-3 font-medium text-slate-500">#${w.id}</td>
+                <td class="py-2.5 px-3 font-semibold text-slate-800">${w.patient_name}</td>
+                <td class="py-2.5 px-3 text-slate-600">${w.preferred_time}</td>
+                <td class="py-2.5 px-3">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isWaiting ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}">
+                    ${w.status}
+                  </span>
+                </td>
+                <td class="py-2.5 px-3 text-right">
+                  ${isWaiting ? `<button onclick="promoteCandidate(${w.id}, '${w.preferred_time}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold hover:underline">Promote</button>` : '-'}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load dashboard:', err);
       }
     }
 
-    async function setStatus(id, status) {
-      await fetch(`/api/appointments/${id}/status?new_status=${status}`, { method: 'PATCH' });
-      loadBoard();
+    async function cancelAppt(id) {
+      if (!confirm(`Cancel appointment #${id}? This will auto-backfill waitlisted patients if available.`)) return;
+      await fetch(`/api/dashboard/cancel/${id}`, { method: 'POST' });
+      loadDashboard();
     }
 
-    document.getElementById('addForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const endpoint = currentMode === 'appt' ? '/api/appointments' : '/api/waitlist';
-      const payload = {
-        patient_name: document.getElementById('patientName').value,
-        patient_phone: document.getElementById('patientPhone').value,
-        doctor_name: document.getElementById('doctorName').value,
-        preferred_doctor: document.getElementById('doctorName').value,
-        appointment_time: document.getElementById('appointmentTime').value,
-        preferred_date: document.getElementById('appointmentTime').value
-      };
-      await fetch(endpoint, {
+    async function promoteCandidate(id, time) {
+      if (!confirm(`Manually promote Waitlist #${id} for ${time}?`)) return;
+      await fetch('/api/dashboard/promote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ waitlist_id: id, slot_time: time })
       });
-      document.getElementById('patientName').value = '';
-      document.getElementById('patientPhone').value = '';
-      if(currentMode === 'appt') loadBoard();
-      else alert("Patient added to waitlist. When someone cancels with " + payload.doctor_name + ", this patient will be prioritized!");
-    });
+      loadDashboard();
+    }
 
-    loadBoard();
-    setInterval(loadBoard, 10000);
+    async function blockCurrentDate() {
+      const selectedDate = document.getElementById('date-select').value;
+      if (!confirm(`Are you sure you want to block all bookings for ${selectedDate}? All active appointments will be cancelled and patients notified.`)) return;
+      await fetch('/api/dashboard/block-date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: selectedDate })
+      });
+      loadDashboard();
+    }
+
+    // Initial load
+    loadDashboard();
   </script>
 </body>
 </html>
