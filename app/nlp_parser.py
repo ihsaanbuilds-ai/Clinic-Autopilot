@@ -50,7 +50,16 @@ def extract_time(text: str) -> str | None:
 def parse_patient_intent(text: str) -> dict:
     lower = text.lower().strip()
     
-    # Priority: Emergency Triaging Override
+    # Priority 1: Resume automated bot mode
+    if any(k in lower for k in ["resume bot", "start bot", "bot on", "restart ai"]):
+        return {"intent": "resume_bot"}
+
+    # Priority 2: Staff Escalation / Human Agent Request
+    escalate_keywords = ["human", "agent", "person", "receptionist", "staff", "talk to someone", "operator", "help desk"]
+    if any(k in lower for k in escalate_keywords):
+        return {"intent": "escalate", "reason": "Patient requested human assistance"}
+
+    # Priority 3: Emergency Triaging Override
     emergency_keywords = ["chest pain", "heart attack", "unconscious", "cannot breathe", "severe bleeding", "emergency", "stroke"]
     if any(k in lower for k in emergency_keywords):
         return {"intent": "emergency"}
@@ -73,11 +82,11 @@ def parse_patient_intent(text: str) -> dict:
     if any(k in lower for k in ["status", "my appointment", "when is my", "check booking"]):
         return {"intent": "status"}
 
-    # Slot inquiries (Check slots/openings before general FAQ)
+    # Slot inquiries
     if any(re.search(rf"\b{k}\b", lower) for k in ["slots", "available", "free", "openings"]):
         return {"intent": "inquire_slots", "date": extract_date(lower) or str(dt_date.today())}
 
-    # Clinic FAQs (Use word boundaries so 'openings' doesn't trigger 'open')
+    # Clinic FAQs
     if any(re.search(rf"\b{k}\b", lower) for k in ["fee", "fees", "cost", "charge", "price", "how much"]):
         return {"intent": "faq_fees"}
     if any(re.search(rf"\b{k}\b", lower) for k in ["address", "location", "where", "directions", "map"]):
@@ -85,7 +94,7 @@ def parse_patient_intent(text: str) -> dict:
     if any(re.search(rf"\b{k}\b", lower) for k in ["timing", "timings", "hours", "open", "working days"]):
         return {"intent": "faq_hours"}
 
-    # Booking requests (detected time or booking verbs)
+    # Booking requests
     detected_time = extract_time(lower)
     if any(re.search(rf"\b{k}\b", lower) for k in ["book", "schedule", "appointment", "reserve", "fix"]) or detected_time:
         return {

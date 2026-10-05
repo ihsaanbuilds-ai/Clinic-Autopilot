@@ -1,3 +1,4 @@
+from app.voice_router import voice_router
 import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,7 @@ app = FastAPI(title="Dr. Kurian's Medical Clinic - Receptionist AI")
 # Mount Routers
 app.include_router(doctor_router)
 app.include_router(dashboard_router)
+app.include_router(voice_router)
 
 # Mount Static UI
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")

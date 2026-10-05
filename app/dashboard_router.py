@@ -9,6 +9,7 @@ from app.receptionist import (
     is_date_blocked
 )
 from app.doctor_router import block_doctor_date
+from app.escalation_manager import get_pending_escalations, resolve_escalation
 
 dashboard_router = APIRouter(prefix="/api/dashboard", tags=["Clinic Dashboard"])
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "clinic.db")
@@ -25,34 +26,33 @@ class PromotePayload(BaseModel):
     waitlist_id: int
     slot_time: str = None
 
+class ResolveEscalationPayload(BaseModel):
+    phone: str
+
 @dashboard_router.get("/metrics")
 def get_dashboard_metrics(target_date: str = None):
     query_date = target_date or str(dt_date.today())
     conn = get_db()
     c = conn.cursor()
 
-    # Confirmed today
     c.execute("""
         SELECT COUNT(*) as count FROM appointments
         WHERE appointment_time LIKE ? AND status = 'confirmed'
     """, (f"{query_date}%",))
     confirmed_count = c.fetchone()["count"]
 
-    # Cancellations today
     c.execute("""
         SELECT COUNT(*) as count FROM appointments
         WHERE appointment_time LIKE ? AND status LIKE '%cancelled%'
     """, (f"{query_date}%",))
     cancelled_count = c.fetchone()["count"]
 
-    # Total waitlisted pending
     c.execute("""
         SELECT COUNT(*) as count FROM waitlist
         WHERE preferred_date = ? AND status = 'waiting'
     """, (query_date,))
     waitlist_count = c.fetchone()["count"]
 
-    # Appointments list
     c.execute("""
         SELECT id, patient_name, patient_phone, appointment_time, status
         FROM appointments
@@ -61,7 +61,6 @@ def get_dashboard_metrics(target_date: str = None):
     """, (f"{query_date}%",))
     appointments = [dict(r) for r in c.fetchall()]
 
-    # Waitlist queue
     c.execute("""
         SELECT id, patient_name, patient_phone, preferred_date, preferred_time, status
         FROM waitlist
@@ -73,6 +72,8 @@ def get_dashboard_metrics(target_date: str = None):
     blocked, reason = is_date_blocked(query_date)
     conn.close()
 
+    escalations = get_pending_escalations()
+
     return {
         "date": query_date,
         "is_blocked": blocked,
@@ -80,10 +81,12 @@ def get_dashboard_metrics(target_date: str = None):
         "summary": {
             "confirmed": confirmed_count,
             "cancelled": cancelled_count,
-            "waitlisted": waitlist_count
+            "waitlisted": waitlist_count,
+            "escalations": len(escalations)
         },
         "appointments": appointments,
-        "waitlist": waitlist
+        "waitlist": waitlist,
+        "escalations": escalations
     }
 
 @dashboard_router.post("/cancel/{appointment_id}")
@@ -104,7 +107,6 @@ def cancel_appointment(appointment_id: int):
     target_date = parts[0]
     slot_time = parts[1][:5] if len(parts) > 1 else None
 
-    # Check auto-backfill
     candidate = get_matching_waitlisted_candidate(target_date, slot_time)
     promoted = False
     if candidate:
@@ -124,3 +126,8 @@ def manual_promote(payload: PromotePayload):
 def block_date_endpoint(payload: BlockDatePayload):
     result = block_doctor_date(payload.date)
     return {"status": "success", "message": result}
+
+@dashboard_router.post("/resolve-escalation")
+def resolve_escalation_endpoint(payload: ResolveEscalationPayload):
+    resolve_escalation(payload.phone)
+    return {"status": "success", "resolved_phone": payload.phone}

@@ -11,7 +11,7 @@
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">🏥 Dr. Kurian's Medical Clinic</h1>
-        <p class="text-sm text-indigo-200">Receptionist AI & Operations Dashboard</p>
+        <p class="text-sm text-indigo-200">Receptionist AI & Front-Desk Operations</p>
       </div>
       <div class="flex items-center gap-3">
         <label for="date-select" class="text-sm font-medium">Select Date:</label>
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Summary Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Confirmed Bookings</h3>
         <p class="text-3xl font-extrabold text-emerald-600 mt-2" id="metric-confirmed">0</p>
@@ -43,9 +43,43 @@
         <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Cancellations</h3>
         <p class="text-3xl font-extrabold text-rose-500 mt-2" id="metric-cancelled">0</p>
       </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-200 bg-amber-50/50">
+        <h3 class="text-sm font-medium text-amber-700 uppercase tracking-wider">Human Takeovers</h3>
+        <p class="text-3xl font-extrabold text-amber-600 mt-2" id="metric-escalations">0</p>
+      </div>
     </div>
 
-    <!-- Schedule Grid -->
+    <!-- Staff Escalation Alerts Section -->
+    <div id="escalation-container" class="hidden bg-white p-6 rounded-xl shadow-sm border border-amber-300">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="relative flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+          </span>
+          <h2 class="text-lg font-bold text-amber-900">⚠️ Staff Action Required (Bot Paused)</h2>
+        </div>
+        <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full" id="escalation-badge">0 Pending</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-amber-200 text-sm">
+          <thead>
+            <tr class="bg-amber-50 text-amber-900">
+              <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
+              <th class="py-2.5 px-3 text-left font-semibold">Phone</th>
+              <th class="py-2.5 px-3 text-left font-semibold">Reason</th>
+              <th class="py-2.5 px-3 text-left font-semibold">Triggered At</th>
+              <th class="py-2.5 px-3 text-right font-semibold">Action</th>
+            </tr>
+          </thead>
+          <tbody id="escalations-tbody" class="divide-y divide-amber-100 text-slate-700">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Main Schedule Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Confirmed & Active Appointments -->
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
@@ -98,7 +132,6 @@
   </main>
 
   <script>
-    // Set default date to today in YYYY-MM-DD
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date-select').value = today;
 
@@ -108,12 +141,13 @@
         const res = await fetch(`/api/dashboard/metrics?target_date=${selectedDate}`);
         const data = await res.json();
 
-        // Update metrics
+        // Metrics
         document.getElementById('metric-confirmed').innerText = data.summary.confirmed;
         document.getElementById('metric-waitlist').innerText = data.summary.waitlisted;
         document.getElementById('metric-cancelled').innerText = data.summary.cancelled;
+        document.getElementById('metric-escalations').innerText = data.summary.escalations;
 
-        // Block banner
+        // Block Banner
         const banner = document.getElementById('block-banner');
         if (data.is_blocked) {
           banner.classList.remove('hidden');
@@ -122,7 +156,30 @@
           banner.classList.add('hidden');
         }
 
-        // Render appointments
+        // Escalations Section
+        const escContainer = document.getElementById('escalation-container');
+        const escTbody = document.getElementById('escalations-tbody');
+        if (data.escalations && data.escalations.length > 0) {
+          escContainer.classList.remove('hidden');
+          document.getElementById('escalation-badge').innerText = `${data.escalations.length} Pending`;
+          escTbody.innerHTML = data.escalations.map(e => `
+            <tr class="hover:bg-amber-50/50 transition">
+              <td class="py-2.5 px-3 font-bold text-slate-900">${e.patient_name}</td>
+              <td class="py-2.5 px-3 font-mono text-xs text-slate-600">${e.patient_phone}</td>
+              <td class="py-2.5 px-3 text-amber-800">${e.reason}</td>
+              <td class="py-2.5 px-3 text-xs text-slate-500">${e.created_at}</td>
+              <td class="py-2.5 px-3 text-right">
+                <button onclick="resolveEscalation('${e.patient_phone}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm transition">
+                  Resolve & Resume Bot
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          escContainer.classList.add('hidden');
+        }
+
+        // Appointments Table
         const apptTbody = document.getElementById('appointments-tbody');
         if (data.appointments.length === 0) {
           apptTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No appointments scheduled for this date.</td></tr>';
@@ -148,7 +205,7 @@
           }).join('');
         }
 
-        // Render waitlist
+        // Waitlist Table
         const wlTbody = document.getElementById('waitlist-tbody');
         if (data.waitlist.length === 0) {
           wlTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">Waitlist is currently clear.</td></tr>';
@@ -177,6 +234,15 @@
       }
     }
 
+    async function resolveEscalation(phone) {
+      await fetch('/api/dashboard/resolve-escalation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      });
+      loadDashboard();
+    }
+
     async function cancelAppt(id) {
       if (!confirm(`Cancel appointment #${id}? This will auto-backfill waitlisted patients if available.`)) return;
       await fetch(`/api/dashboard/cancel/${id}`, { method: 'POST' });
@@ -195,7 +261,7 @@
 
     async function blockCurrentDate() {
       const selectedDate = document.getElementById('date-select').value;
-      if (!confirm(`Are you sure you want to block all bookings for ${selectedDate}? All active appointments will be cancelled and patients notified.`)) return;
+      if (!confirm(`Block all bookings for ${selectedDate}?`)) return;
       await fetch('/api/dashboard/block-date', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,8 +270,9 @@
       loadDashboard();
     }
 
-    // Initial load
+    // Refresh every 10 seconds automatically for live operations
     loadDashboard();
+    setInterval(loadDashboard, 10000);
   </script>
 </body>
 </html>

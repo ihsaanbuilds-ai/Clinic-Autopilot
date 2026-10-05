@@ -1,4 +1,4 @@
-from twilio.request_validator import RequestValidator
+from app.followup_engine import dispatch_post_consultation_followups, handle_feedback_response
 import sqlite3
 import os
 import re
@@ -19,6 +19,11 @@ from app.nlp_parser import parse_patient_intent
 from app.reminders import dispatch_day_before_reminders
 from app.notifier import send_whatsapp_message
 from app.session_manager import get_session, update_session, clear_session
+from app.escalation_manager import (
+    is_patient_escalated, 
+    trigger_escalation, 
+    resolve_escalation
+)
 
 doctor_router = APIRouter(prefix="/api/doctor", tags=["Doctor & Patient Portal"])
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "clinic.db")
@@ -213,6 +218,26 @@ def handle_doctor_commands(msg: str) -> str:
 def handle_receptionist_ai(raw_text: str, sender_phone: str, sender_name: str) -> str:
     clean = raw_text.strip()
     session = get_session(sender_phone)
+    # Check if message is a post-consultation 1-5 feedback rating
+    feedback_reply = handle_feedback_response(sender_phone, raw_text)
+    if feedback_reply:
+        return feedback_reply
+
+    parsed = parse_patient_intent(raw_text)
+    intent = parsed["intent"]
+
+    # Check if patient wants to resume the bot
+    if intent == "resume_bot":
+        resolve_escalation(sender_phone)
+        return f"🤖 Receptionist AI reactivated! How can I assist you today, {sender_name}?"
+
+    # Check if this patient is currently escalated to staff
+    if is_patient_escalated(sender_phone):
+        return "ℹ Your chat is currently assigned to front-desk staff. A receptionist will assist you directly. To switch back to AI, reply *'resume bot'*."
+
+    # Process explicit escalation
+    if intent == "escalate":
+        return trigger_escalation(sender_phone, sender_name, parsed.get("reason", "Requested staff"))
     
     if clean == "1":
         appts = get_patient_active_appointments(sender_phone)
@@ -221,9 +246,6 @@ def handle_receptionist_ai(raw_text: str, sender_phone: str, sender_name: str) -
         return "You have no upcoming appointment to confirm."
     elif clean == "2":
         return cancel_patient_appointment(sender_phone)
-
-    parsed = parse_patient_intent(raw_text)
-    intent = parsed["intent"]
 
     if intent == "emergency":
         return CLINIC_FAQ["emergency"]
@@ -241,7 +263,6 @@ def handle_receptionist_ai(raw_text: str, sender_phone: str, sender_name: str) -
     if intent == "inquire_slots":
         target = parsed.get("date") or session.get("last_date") or str(dt_date.today())
         
-        # Check if the requested date is closed/blocked before evaluating slot arrays
         blocked, reason = is_date_blocked(target)
         if blocked:
             return f"ℹ *{target}*: {reason}\nOur clinic hours are Monday through Saturday, 9:00 AM – 5:30 PM."
@@ -301,6 +322,7 @@ def handle_receptionist_ai(raw_text: str, sender_phone: str, sender_name: str) -
         f"• *Book an appointment*: _'Can I book 2:30pm tomorrow?'_\n"
         f"• *Check fee/timings*: _'How much is consultation?'_\n"
         f"• *Reschedule*: _'Reschedule my visit to 3pm tomorrow'_\n"
+        f"• *Speak with staff*: _'Talk to human'_\n"
         f"• *Cancel*: _'Cancel my appointment'_"
     )
 
@@ -342,12 +364,6 @@ async def whatsapp_webhook_handler(request: Request):
     resp.message(reply_text)
     return Response(content=str(resp), media_type="application/xml")
 
-def verify_twilio_signature(request_url: str, post_data: dict, signature: str) -> bool:
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    if not auth_token:
-        # Development mode bypass
-        return True
-    if not signature:
-        return False
-    validator = RequestValidator(auth_token)
-    return validator.validate(request_url, post_data, signature)
+@doctor_router.post("/trigger-followups")
+def trigger_followups_endpoint(days_ago: int = 2):
+    return dispatch_post_consultation_followups(days_ago)
