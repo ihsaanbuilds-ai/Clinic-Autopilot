@@ -1,3 +1,12 @@
+
+def get_clinic_doctors() -> list[dict]:
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, name, specialty, consultation_fee FROM doctors WHERE active = 1")
+    docs = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return docs
+from app.payment_gateway import create_payment_link
 from app.followup_engine import dispatch_post_consultation_followups, handle_feedback_response
 import sqlite3
 import os

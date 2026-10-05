@@ -1,3 +1,4 @@
+from app.license_manager import get_license_status, renew_subscription
 import sqlite3
 import os
 from datetime import date as dt_date, datetime
@@ -131,3 +132,11 @@ def block_date_endpoint(payload: BlockDatePayload):
 def resolve_escalation_endpoint(payload: ResolveEscalationPayload):
     resolve_escalation(payload.phone)
     return {"status": "success", "resolved_phone": payload.phone}
+
+@dashboard_router.get("/subscription")
+def get_subscription_endpoint():
+    return get_license_status()
+
+@dashboard_router.post("/subscription/renew")
+def renew_subscription_endpoint(days: int = 30):
+    return renew_subscription(days)

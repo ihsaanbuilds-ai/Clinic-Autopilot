@@ -2,134 +2,207 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dr. Kurian's Clinic - Staff Dashboard</title>
+  <title>ReceptionistAI Pro | Dr. Kurian's Medical Clinic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <header class="bg-indigo-700 text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">🏥 Dr. Kurian's Medical Clinic</h1>
-        <p class="text-sm text-indigo-200">Receptionist AI & Front-Desk Operations</p>
-      </div>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased">
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <label for="date-select" class="text-sm font-medium">Select Date:</label>
-        <input type="date" id="date-select" class="text-slate-800 px-3 py-1.5 rounded-md border border-indigo-300 font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-400">
-        <button onclick="loadDashboard()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold transition">Refresh</button>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
+          <i class="ph-bold ph-first-aid-kit"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-white tracking-tight leading-none">Dr. Kurian's Clinic</h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">SaaS Live</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">ReceptionistAI Autonomous Reception</p>
+        </div>
+      </div>
+
+      <!-- Date Filter & Actions -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5 shadow-inner">
+          <i class="ph ph-calendar text-slate-400 mr-2 text-base"></i>
+          <input type="date" id="date-select" class="bg-transparent text-sm text-slate-200 outline-none font-medium cursor-pointer">
+        </div>
+        <button onclick="loadDashboard()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
+          <i class="ph-bold ph-arrows-clockwise text-sm"></i> Sync
+        </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    <!-- Status Banner for Blocked Dates -->
-    <div id="block-banner" class="hidden bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-md">
-      <div class="flex items-center">
-        <span class="text-amber-800 font-semibold" id="block-reason"></span>
+  <!-- Subscription Status Bar -->
+  <div class="bg-slate-800/40 border-b border-slate-700/40 px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2 text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Plan: <strong id="sub-plan" class="text-white">Monthly Pro</strong></span>
+        <span class="text-slate-500">•</span>
+        <span>Expires in: <strong id="sub-days" class="text-emerald-400">30 days</strong></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="renewPlan(30)" class="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline flex items-center gap-1">
+          <i class="ph-bold ph-credit-card"></i> Extend / Pay Plan (₹4,999)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+    <!-- Notice Banner for Doctor Leave / Blocked Dates -->
+    <div id="block-banner" class="hidden bg-rose-950/60 border border-rose-500/40 p-4 rounded-xl flex items-center justify-between text-rose-200 shadow-lg">
+      <div class="flex items-center gap-3">
+        <i class="ph-fill ph-warning-circle text-rose-400 text-2xl"></i>
+        <div>
+          <h4 class="font-bold text-sm text-white">Date Blocked by Doctor</h4>
+          <p class="text-xs text-rose-300" id="block-reason">Dr. Kurian has placed a hold on this day.</p>
+        </div>
       </div>
     </div>
 
-    <!-- Summary Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Confirmed Bookings</h3>
-        <p class="text-3xl font-extrabold text-emerald-600 mt-2" id="metric-confirmed">0</p>
+    <!-- Metric KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Confirmed Bookings</span>
+          <i class="ph-duotone ph-check-circle text-emerald-400 text-xl"></i>
+        </div>
+        <div class="text-3xl font-extrabold text-white" id="metric-confirmed">0</div>
+        <p class="text-[11px] text-slate-400 mt-1">Confirmed patient slots</p>
       </div>
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Waitlist Queue</h3>
-        <p class="text-3xl font-extrabold text-indigo-600 mt-2" id="metric-waitlist">0</p>
+
+      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Priority Waitlist</span>
+          <i class="ph-duotone ph-queue text-indigo-400 text-xl"></i>
+        </div>
+        <div class="text-3xl font-extrabold text-white" id="metric-waitlist">0</div>
+        <p class="text-[11px] text-slate-400 mt-1">Automatic auto-fill queue</p>
       </div>
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 class="text-sm font-medium text-slate-500 uppercase tracking-wider">Cancellations</h3>
-        <p class="text-3xl font-extrabold text-rose-500 mt-2" id="metric-cancelled">0</p>
+
+      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Cancellations</span>
+          <i class="ph-duotone ph-x-circle text-rose-400 text-xl"></i>
+        </div>
+        <div class="text-3xl font-extrabold text-white" id="metric-cancelled">0</div>
+        <p class="text-[11px] text-slate-400 mt-1">Recovered or refunded</p>
       </div>
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-200 bg-amber-50/50">
-        <h3 class="text-sm font-medium text-amber-700 uppercase tracking-wider">Human Takeovers</h3>
-        <p class="text-3xl font-extrabold text-amber-600 mt-2" id="metric-escalations">0</p>
+
+      <div class="bg-slate-800/70 border border-amber-500/40 bg-amber-500/5 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between text-amber-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Human Escalations</span>
+          <i class="ph-duotone ph-user-switch text-amber-400 text-xl"></i>
+        </div>
+        <div class="text-3xl font-extrabold text-amber-400" id="metric-escalations">0</div>
+        <p class="text-[11px] text-amber-300/70 mt-1">Bot paused for staff reply</p>
       </div>
     </div>
 
-    <!-- Staff Escalation Alerts Section -->
-    <div id="escalation-container" class="hidden bg-white p-6 rounded-xl shadow-sm border border-amber-300">
+    <!-- Active Human Escalations Container (Pops up when active) -->
+    <div id="escalation-container" class="hidden bg-amber-950/40 border border-amber-500/50 rounded-2xl p-5 shadow-xl">
       <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <span class="relative flex h-3 w-3">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
           </span>
-          <h2 class="text-lg font-bold text-amber-900">⚠️ Staff Action Required (Bot Paused)</h2>
+          <h2 class="text-base font-bold text-amber-200">Staff Intervention Required</h2>
+          <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30" id="escalation-badge">0 Pending</span>
         </div>
-        <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full" id="escalation-badge">0 Pending</span>
       </div>
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-amber-200 text-sm">
+        <table class="min-w-full divide-y divide-amber-900/60 text-xs">
           <thead>
-            <tr class="bg-amber-50 text-amber-900">
-              <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
-              <th class="py-2.5 px-3 text-left font-semibold">Phone</th>
-              <th class="py-2.5 px-3 text-left font-semibold">Reason</th>
-              <th class="py-2.5 px-3 text-left font-semibold">Triggered At</th>
+            <tr class="text-slate-400 text-left uppercase tracking-wider">
+              <th class="py-2.5 px-3 font-semibold">Patient</th>
+              <th class="py-2.5 px-3 font-semibold">Phone</th>
+              <th class="py-2.5 px-3 font-semibold">Reason</th>
+              <th class="py-2.5 px-3 font-semibold">Triggered At</th>
               <th class="py-2.5 px-3 text-right font-semibold">Action</th>
             </tr>
           </thead>
-          <tbody id="escalations-tbody" class="divide-y divide-amber-100 text-slate-700">
-            <!-- Dynamic rows -->
+          <tbody id="escalations-tbody" class="divide-y divide-amber-900/40 text-slate-200">
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Main Schedule Grid -->
+    <!-- Operations Panel (Appointments + Waitlist) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Confirmed & Active Appointments -->
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+      <!-- Appointments Table -->
+      <div class="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-5 flex flex-col shadow-sm">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-slate-800">📋 Daily Appointments</h2>
-          <button onclick="blockCurrentDate()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold border border-rose-200 px-3 py-1.5 rounded-md transition">Block This Date</button>
+          <div class="flex items-center gap-2">
+            <i class="ph-bold ph-calendar-check text-indigo-400 text-lg"></i>
+            <h3 class="text-sm font-bold text-white tracking-tight">Active Appointments</h3>
+          </div>
+          <button onclick="blockCurrentDate()" class="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg transition font-medium">
+            Block Selected Day
+          </button>
         </div>
         <div class="overflow-x-auto flex-1">
-          <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <table class="min-w-full divide-y divide-slate-700/60 text-xs">
             <thead>
-              <tr class="bg-slate-50 text-slate-600">
-                <th class="py-2.5 px-3 text-left font-semibold">Time</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Phone</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Status</th>
-                <th class="py-2.5 px-3 text-right font-semibold">Action</th>
+              <tr class="text-slate-400 text-left uppercase tracking-wider">
+                <th class="py-2 px-3 font-semibold">Time</th>
+                <th class="py-2 px-3 font-semibold">Patient</th>
+                <th class="py-2 px-3 font-semibold">Phone</th>
+                <th class="py-2 px-3 font-semibold">Status</th>
+                <th class="py-2 px-3 text-right font-semibold">Action</th>
               </tr>
             </thead>
-            <tbody id="appointments-tbody" class="divide-y divide-slate-100 text-slate-700">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading appointments...</td></tr>
+            <tbody id="appointments-tbody" class="divide-y divide-slate-700/40 text-slate-300">
+              <tr><td colspan="5" class="py-6 text-center text-slate-500">Loading appointments...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Priority Waitlist Queue -->
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+      <!-- Priority Waitlist -->
+      <div class="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-5 flex flex-col shadow-sm">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-slate-800">⏳ Priority Waitlist</h2>
-          <span class="text-xs text-slate-500 font-medium">Automatic backfill on cancel</span>
+          <div class="flex items-center gap-2">
+            <i class="ph-bold ph-clock-countdown text-indigo-400 text-lg"></i>
+            <h3 class="text-sm font-bold text-white tracking-tight">Priority Waitlist Queue</h3>
+          </div>
+          <span class="text-[11px] text-slate-400 font-medium">Auto-fill on cancellation</span>
         </div>
         <div class="overflow-x-auto flex-1">
-          <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <table class="min-w-full divide-y divide-slate-700/60 text-xs">
             <thead>
-              <tr class="bg-slate-50 text-slate-600">
-                <th class="py-2.5 px-3 text-left font-semibold">ID</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Patient</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Pref. Time</th>
-                <th class="py-2.5 px-3 text-left font-semibold">Status</th>
-                <th class="py-2.5 px-3 text-right font-semibold">Action</th>
+              <tr class="text-slate-400 text-left uppercase tracking-wider">
+                <th class="py-2 px-3 font-semibold">Queue ID</th>
+                <th class="py-2 px-3 font-semibold">Patient</th>
+                <th class="py-2 px-3 font-semibold">Preferred</th>
+                <th class="py-2 px-3 font-semibold">Status</th>
+                <th class="py-2 px-3 text-right font-semibold">Action</th>
               </tr>
             </thead>
-            <tbody id="waitlist-tbody" class="divide-y divide-slate-100 text-slate-700">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading waitlist...</td></tr>
+            <tbody id="waitlist-tbody" class="divide-y divide-slate-700/40 text-slate-300">
+              <tr><td colspan="5" class="py-6 text-center text-slate-500">Loading waitlist...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
   </main>
+
+  <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-slate-500 text-xs">
+    ReceptionistAI Platform • Autonomous Clinic Operations & Smart Receptionist
+  </footer>
 
   <script>
     const today = new Date().toISOString().split('T')[0];
@@ -138,39 +211,46 @@
     async function loadDashboard() {
       const selectedDate = document.getElementById('date-select').value;
       try {
+        // Fetch dashboard metrics
         const res = await fetch(`/api/dashboard/metrics?target_date=${selectedDate}`);
         const data = await res.json();
 
-        // Metrics
+        // Fetch subscription status
+        const subRes = await fetch('/api/dashboard/subscription');
+        const subData = await subRes.json();
+        document.getElementById('sub-plan').innerText = subData.plan_name || 'Standard';
+        document.getElementById('sub-days').innerText = `${subData.days_remaining} days left`;
+
+        // Update KPIs
         document.getElementById('metric-confirmed').innerText = data.summary.confirmed;
         document.getElementById('metric-waitlist').innerText = data.summary.waitlisted;
         document.getElementById('metric-cancelled').innerText = data.summary.cancelled;
         document.getElementById('metric-escalations').innerText = data.summary.escalations;
 
-        // Block Banner
+        // Block Notice
         const banner = document.getElementById('block-banner');
         if (data.is_blocked) {
           banner.classList.remove('hidden');
-          document.getElementById('block-reason').innerText = `⚠ Notice: ${data.block_reason}`;
+          document.getElementById('block-reason').innerText = data.block_reason;
         } else {
           banner.classList.add('hidden');
         }
 
-        // Escalations Section
+        // Escalations
         const escContainer = document.getElementById('escalation-container');
         const escTbody = document.getElementById('escalations-tbody');
         if (data.escalations && data.escalations.length > 0) {
           escContainer.classList.remove('hidden');
           document.getElementById('escalation-badge').innerText = `${data.escalations.length} Pending`;
           escTbody.innerHTML = data.escalations.map(e => `
-            <tr class="hover:bg-amber-50/50 transition">
-              <td class="py-2.5 px-3 font-bold text-slate-900">${e.patient_name}</td>
-              <td class="py-2.5 px-3 font-mono text-xs text-slate-600">${e.patient_phone}</td>
-              <td class="py-2.5 px-3 text-amber-800">${e.reason}</td>
-              <td class="py-2.5 px-3 text-xs text-slate-500">${e.created_at}</td>
+            <tr class="hover:bg-amber-500/10 transition">
+              <td class="py-2.5 px-3 font-bold text-white">${e.patient_name}</td>
+              <td class="py-2.5 px-3 font-mono text-slate-400">${e.patient_phone}</td>
+              <td class="py-2.5 px-3 text-amber-200">${e.reason}</td>
+              <td class="py-2.5 px-3 text-slate-400">${e.created_at}</td>
               <td class="py-2.5 px-3 text-right">
-                <button onclick="resolveEscalation('${e.patient_phone}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm transition">
-                  Resolve & Resume Bot
+                <button onclick="resolveEscalation('${e.patient_phone}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2.5 py-1 rounded transition shadow-sm text-xs">
+                  Resolve & Resume AI
                 </button>
               </td>
             </tr>
@@ -182,23 +262,23 @@
         // Appointments Table
         const apptTbody = document.getElementById('appointments-tbody');
         if (data.appointments.length === 0) {
-          apptTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No appointments scheduled for this date.</td></tr>';
+          apptTbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">No appointments scheduled for this date.</td></tr>';
         } else {
           apptTbody.innerHTML = data.appointments.map(a => {
             const timeStr = a.appointment_time.split(' ')[1] ? a.appointment_time.split(' ')[1].substring(0, 5) : a.appointment_time;
             const isConfirmed = a.status === 'confirmed';
             return `
-              <tr class="hover:bg-slate-50 transition">
-                <td class="py-2.5 px-3 font-semibold text-slate-900">${timeStr}</td>
-                <td class="py-2.5 px-3 font-medium">${a.patient_name}</td>
-                <td class="py-2.5 px-3 text-slate-500">${a.patient_phone}</td>
+              <tr class="hover:bg-slate-700/30 transition">
+                <td class="py-2.5 px-3 font-bold text-white">${timeStr}</td>
+                <td class="py-2.5 px-3 font-medium text-slate-200">${a.patient_name}</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">${a.patient_phone}</td>
                 <td class="py-2.5 px-3">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isConfirmed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isConfirmed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}">
                     ${a.status}
                   </span>
                 </td>
                 <td class="py-2.5 px-3 text-right">
-                  ${isConfirmed ? `<button onclick="cancelAppt(${a.id})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold hover:underline">Cancel</button>` : '-'}
+                  ${isConfirmed ? `<button onclick="cancelAppt(${a.id})" class="text-rose-400 hover:text-rose-300 font-medium hover:underline text-xs">Cancel</button>` : '-'}
                 </td>
               </tr>
             `;
@@ -208,22 +288,22 @@
         // Waitlist Table
         const wlTbody = document.getElementById('waitlist-tbody');
         if (data.waitlist.length === 0) {
-          wlTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">Waitlist is currently clear.</td></tr>';
+          wlTbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Waitlist is currently empty.</td></tr>';
         } else {
           wlTbody.innerHTML = data.waitlist.map(w => {
             const isWaiting = w.status === 'waiting';
             return `
-              <tr class="hover:bg-slate-50 transition">
-                <td class="py-2.5 px-3 font-medium text-slate-500">#${w.id}</td>
-                <td class="py-2.5 px-3 font-semibold text-slate-800">${w.patient_name}</td>
-                <td class="py-2.5 px-3 text-slate-600">${w.preferred_time}</td>
+              <tr class="hover:bg-slate-700/30 transition">
+                <td class="py-2.5 px-3 font-mono text-slate-400">#${w.id}</td>
+                <td class="py-2.5 px-3 font-semibold text-white">${w.patient_name}</td>
+                <td class="py-2.5 px-3 text-slate-300">${w.preferred_time}</td>
                 <td class="py-2.5 px-3">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isWaiting ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isWaiting ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-slate-700 text-slate-400'}">
                     ${w.status}
                   </span>
                 </td>
                 <td class="py-2.5 px-3 text-right">
-                  ${isWaiting ? `<button onclick="promoteCandidate(${w.id}, '${w.preferred_time}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold hover:underline">Promote</button>` : '-'}
+                  ${isWaiting ? `<button onclick="promoteCandidate(${w.id}, '${w.preferred_time}')" class="text-indigo-400 hover:text-indigo-300 font-medium hover:underline text-xs">Promote</button>` : '-'}
                 </td>
               </tr>
             `;
@@ -232,6 +312,13 @@
       } catch (err) {
         console.error('Failed to load dashboard:', err);
       }
+    }
+
+    async function renewPlan(days) {
+      if (!confirm(`Process subscription extension for ${days} days (₹4,999)?`)) return;
+      await fetch(`/api/dashboard/subscription/renew?days=${days}`, { method: 'POST' });
+      alert('✅ Plan successfully renewed!');
+      loadDashboard();
     }
 
     async function resolveEscalation(phone) {
@@ -244,13 +331,13 @@
     }
 
     async function cancelAppt(id) {
-      if (!confirm(`Cancel appointment #${id}? This will auto-backfill waitlisted patients if available.`)) return;
+      if (!confirm(`Cancel appointment #${id}? This will auto-promote waitlisted patients if available.`)) return;
       await fetch(`/api/dashboard/cancel/${id}`, { method: 'POST' });
       loadDashboard();
     }
 
     async function promoteCandidate(id, time) {
-      if (!confirm(`Manually promote Waitlist #${id} for ${time}?`)) return;
+      if (!confirm(`Manually promote Waitlist #${id} to ${time}?`)) return;
       await fetch('/api/dashboard/promote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,7 +357,6 @@
       loadDashboard();
     }
 
-    // Refresh every 10 seconds automatically for live operations
     loadDashboard();
     setInterval(loadDashboard, 10000);
   </script>
