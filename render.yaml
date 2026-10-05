@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: receptionist-ai
+    env: python
+    region: singapore
+    plan: standard
+    buildCommand: "pip install -r requirements.txt && python3 migrate_db.py && python3 migrate_sessions.py && python3 migrate_escalation.py && python3 migrate_followups.py && python3 migrate_multidoctor.py && python3 migrate_licenses.py"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: CLINIC_NAME
+        value: "Dr. Kurian's Medical Clinic"
+      - key: DOCTOR_NAME
+        value: "Dr. Kurian"
+      - key: DOCTOR_PHONE
+        value: "+918928740867"
+      - key: CONSULTATION_FEE
+        value: "500"
+      - key: FOLLOWUP_FEE
+        value: "300"
+      - key: CLINIC_LOCATION
+        value: "2nd Floor, Apex Health Centre, Main Road, Thiruvananthapuram"
+      - key: GOOGLE_REVIEW_LINK
+        value: "https://g.page/r/dr-kurian-clinic/review"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+    disk:
+      name: clinic-data
+      mountPath: /data
+      sizeGB: 1
