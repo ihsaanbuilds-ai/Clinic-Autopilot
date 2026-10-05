@@ -44,15 +44,34 @@ def init_all():
         )
     """)
 
-    # 4. Patient Sessions table
+    # 4. Patient Sessions table (Ensure column is 'phone')
     c.execute("""
         CREATE TABLE IF NOT EXISTS patient_sessions (
-            patient_phone TEXT PRIMARY KEY,
+            phone TEXT PRIMARY KEY,
             last_date TEXT,
             pending_intent TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Migrate existing patient_sessions table if it was created with 'patient_phone'
+    c.execute("PRAGMA table_info(patient_sessions)")
+    columns = [col[1] for col in c.fetchall()]
+    if "patient_phone" in columns and "phone" not in columns:
+        try:
+            c.execute("ALTER TABLE patient_sessions RENAME COLUMN patient_phone TO phone")
+            print("🔄 Renamed patient_sessions.patient_phone to phone")
+        except Exception:
+            c.execute("DROP TABLE patient_sessions")
+            c.execute("""
+                CREATE TABLE patient_sessions (
+                    phone TEXT PRIMARY KEY,
+                    last_date TEXT,
+                    pending_intent TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            print("🔄 Recreated patient_sessions with 'phone' column")
 
     # 5. Staff Escalations table
     c.execute("""
@@ -137,7 +156,7 @@ def init_all():
 
     conn.commit()
     conn.close()
-    print("✅ All database tables successfully initialized and verified.")
+    print("✅ Schema verified and aligned.")
 
 if __name__ == "__main__":
     init_all()
