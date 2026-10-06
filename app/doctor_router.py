@@ -417,3 +417,49 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
         f"• To book: 'Book 10:30 am tomorrow for {profile_name}'\n"
         f"• To cancel: 'Cancel my appointment'"
     )
+
+
+
+def trigger_doctor_briefing():
+    """
+    Summarizes today's confirmed appointments and waitlist,
+    returning a briefing string for the doctor.
+    """
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    try:
+        c.execute("""
+            SELECT patient_name, appointment_time, status 
+            FROM appointments 
+            WHERE appointment_time LIKE ? AND status = 'confirmed'
+            ORDER BY appointment_time ASC
+        """, (f"{today_str}%",))
+        appts = c.fetchall()
+
+        c.execute("""
+            SELECT COUNT(*) as count FROM waitlist 
+            WHERE preferred_date = ? AND status = 'waiting'
+        """, (today_str,))
+        waiter_count = c.fetchone()["count"]
+
+        briefing = f"📋 Good morning Doctor! Daily Briefing ({today_str}):\n"
+        briefing += f"• Total Confirmed Appointments: {len(appts)}\n"
+        briefing += f"• Patients on Waitlist: {waiter_count}\n\n"
+
+        if appts:
+            briefing += "Schedule:\n"
+            for row in appts:
+                time_part = str(row["appointment_time"]).split(" ")[1][:5]
+                briefing += f" - {time_part}: {row['patient_name']}\n"
+        else:
+            briefing += "No appointments scheduled yet for today.\n"
+
+        print(briefing)
+        return briefing
+    except Exception as e:
+        print(f"Error generating briefing: {e}")
+        return f"Error generating daily briefing: {e}"
+    finally:
+        conn.close()
