@@ -1,6 +1,6 @@
 from app.billing_router import billing_router
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, status, Header, HTTPException, status
 import os
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "clinic-pilot-secure-key-2026")
@@ -14,12 +14,27 @@ def verify_admin_key(x_admin_secret: str = Header(None)):
 
 from app.voice_router import voice_router
 import os
-from fastapi import FastAPI
+from fastapi import Header, status, FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.doctor_router import doctor_router
 from app.dashboard_router import dashboard_router
 from app.scheduler import start_scheduler, shutdown_scheduler
+
+
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "pilot_secret_2026")
+
+def verify_admin_access(
+    x_admin_secret: str = Header(None),
+    admin_token: str = None
+):
+    token = x_admin_secret or admin_token
+    if not token or token != ADMIN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Valid X-Admin-Secret header or admin_token parameter required."
+        )
+    return True
 
 app = FastAPI(title="Dr. Kurian's Medical Clinic - Receptionist AI")
 

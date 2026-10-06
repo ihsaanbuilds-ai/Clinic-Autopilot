@@ -88,6 +88,6 @@ def handle_feedback_response(phone: str, text: str) -> str | None:
         conn.close()
         return (
             f"We're sorry to hear you're still not feeling well, {record['patient_name']}.\n\n"
-            f"Dr. Kurian recommends scheduling a follow-up visit. Consultation within 7 days is just ₹300.\n"
+            f"Our clinic care team has been notified and Dr. Kurian’s staff will review your case directly.\n"
             f"Would you like to book a follow-up slot this week? Reply with a preferred day/time (e.g., *'Book follow-up tomorrow 10am'*)."
         )
