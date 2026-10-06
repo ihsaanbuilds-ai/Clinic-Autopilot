@@ -469,3 +469,25 @@ def trigger_doctor_briefing():
         return f"Error generating daily briefing: {e}"
     finally:
         conn.close()
+
+
+@doctor_router.post("/whatsapp-webhook")
+async def whatsapp_webhook(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    sender_phone = data.get("phone") or data.get("from") or ""
+    sender_name = data.get("name") or data.get("sender_name") or "Patient"
+    message_body = data.get("message") or data.get("text") or data.get("body") or ""
+
+    if not sender_phone or not message_body:
+        return {"status": "ignored", "detail": "Missing phone or message text"}
+
+    try:
+        reply_text = handle_whatsapp_message(sender_phone, sender_name, message_body)
+        return {"status": "success", "reply": reply_text}
+    except Exception as e:
+        print(f"Error handling WhatsApp message: {e}")
+        return {"status": "error", "reply": "Thank you for contacting Dr. Kurian's clinic. An assistant will get back to you shortly."}
