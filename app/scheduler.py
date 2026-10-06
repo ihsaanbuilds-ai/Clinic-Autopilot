@@ -1,3 +1,6 @@
+from zoneinfo import ZoneInfo
+
+KOLKATA_TZ = ZoneInfo("Asia/Kolkata")
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.reminders import dispatch_day_before_reminders
 from app.followup_engine import dispatch_post_consultation_followups

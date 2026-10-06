@@ -49,3 +49,22 @@ def on_shutdown():
     shutdown_scheduler()
 
 app.include_router(billing_router)
+
+
+@app.post("/api/appointments/{appt_id}/status")
+async def update_appointment_status(appt_id: int, status_update: dict):
+    new_status = status_update.get("status")
+    if new_status not in ["completed", "no_show", "confirmed", "cancelled"]:
+        raise HTTPException(status_code=400, detail="Invalid appointment status")
+    
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE appointments SET status = ? WHERE id = ?", (new_status, appt_id))
+        conn.commit()
+        return {"status": "success", "appointment_id": appt_id, "new_status": new_status}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
