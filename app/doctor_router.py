@@ -255,55 +255,52 @@ def log_staff_escalation(phone: str, name: str, reason: str):
 
 def parse_date_and_time(text: str):
     clean = text.lower().strip()
-    
-    # 1. Date extraction
-    target_date = None
     today = datetime.now().date()
-    
-    # Match explicit ISO date YYYY-MM-DD
-    iso_match = re.search(r'(202\d-\d{2}-\d{2})', clean)
+    target_date = None
+
+    # Date extraction
+    iso_match = re.search(r'\b(202\d-\d{2}-\d{2})\b', clean)
     if iso_match:
         target_date = iso_match.group(1)
-        clean = clean.replace(target_date, "")
     elif "tomorrow" in clean or "nale" in clean:
         target_date = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-        clean = clean.replace("tomorrow", "").replace("nale", "")
     elif "today" in clean or "inun" in clean:
         target_date = today.strftime("%Y-%m-%d")
-        clean = clean.replace("today", "").replace("inun", "")
 
-    # 2. Time extraction (require colon or am/pm to avoid matching generic integers like "2 kids")
+    # Time extraction: matches 10:30 am, 10:30am, 10 am, 10:30, 16:00
     target_time = None
-    time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)|(\d{1,2}):(\d{2})', clean)
+    time_match = re.search(r'\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b', clean)
     if time_match:
-        matched_str = time_match.group(0)
-        clean = clean.replace(matched_str, "")
-        if "am" in matched_str or "pm" in matched_str:
-            is_pm = "pm" in matched_str
-            digits = re.findall(r'\d+', matched_str)
-            hr = int(digits[0])
-            minute = int(digits[1]) if len(digits) > 1 else 0
-            if is_pm and hr < 12:
-                hr += 12
-            elif not is_pm and hr == 12:
-                hr = 0
-            target_time = f"{hr:02d}:{minute:02d}"
-        else:
-            parts = matched_str.split(":")
-            target_time = f"{int(parts[0]):02d}:{int(parts[1]):02d}"
+        raw_hr = int(time_match.group(1))
+        raw_min = int(time_match.group(2)) if time_match.group(2) else 0
+        meridiem = time_match.group(3)
 
-    # 3. Patient Name Extraction fallback
-    name_match = re.search(r'for\s+([A-Za-z\s]+)', text, re.IGNORECASE)
-    patient_name = name_match.group(1).strip() if name_match else None
+        # Only treat as time if meridiem is present OR colon is used OR hour is in business range (9-20)
+        if meridiem or time_match.group(2) or (9 <= raw_hr <= 20):
+            if meridiem:
+                if meridiem == "pm" and raw_hr < 12:
+                    raw_hr += 12
+                elif meridiem == "am" and raw_hr == 12:
+                    raw_hr = 0
+            if 0 <= raw_hr <= 23 and 0 <= raw_min <= 59:
+                target_time = f"{raw_hr:02d}:{raw_min:02d}"
+
+    # Name extraction: handles "for Sehil MC", "for Sehil", etc.
+    patient_name = None
+    name_match = re.search(r'\bfor\s+([A-Za-z0-9\s\._-]+)', text, re.IGNORECASE)
+    if name_match:
+        raw_n = name_match.group(1).strip()
+        patient_name = re.sub(r'\b(tomorrow|today|at|am|pm)\b', '', raw_n, flags=re.IGNORECASE).strip()
 
     return target_date, target_time, patient_name
 
 
 def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: str = "Patient") -> str:
     msg_clean = incoming_msg.strip()
+    msg_lower = msg_clean.lower()
     clean_phone = sender_phone.replace("whatsapp:", "").replace("+", "").strip()
 
-    # 1. IMMEDIATE EMERGENCY TRIAGE (Preempts all intent/session parsing)
+    # 1. IMMEDIATE EMERGENCY TRIAGE
     if check_emergency_triage(msg_clean):
         log_staff_escalation(clean_phone, profile_name, f"Emergency Triage Triggered: {msg_clean}")
         return (
@@ -313,16 +310,64 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
             "Our clinic staff has been alerted to your message."
         )
 
-    # 2. CANCELLATION REQUEST
-    if re.search(r'\b(cancel|cancellation)\b', msg_clean.lower()):
+    # 2. MEDICAL ADVICE & PRESCRIPTION GUARDRAIL
+    if re.search(r'\b(prescribe|prescription|medicine|antibiotic|antibiotics|dosage|diagnose|fever|cough)\b', msg_lower) and not re.search(r'\b(book|slot|cancel)\b', msg_lower):
+        return (
+            "⚠️ *Medical Notice*:\n"
+            "As an AI clinic assistant, I cannot diagnose illnesses or prescribe medications autonomously.\n\n"
+            "Please book an in-person consultation with Dr. Kurian so you can be properly evaluated. "
+            "Reply *'Available slots tomorrow'* to schedule an appointment."
+        )
+
+    # 3. CLINIC INFORMATION: LOCATION, TIMINGS, FEES
+    if re.search(r'\b(where|location|address|place|find you)\b', msg_lower) or \
+       (re.search(r'\b(timings?|hours|open|closed|closing)\b', msg_lower) and not re.search(r'\b(slot|book|reserve)\b', msg_lower)):
+        return (
+            "🏥 *Dr. Kurian's Medical Clinic*\n\n"
+            "📍 *Location*: MG Road, Central Junction, Kochi, Kerala\n"
+            "🕒 *Working Hours*: Monday to Saturday, 9:00 AM – 6:00 PM (Closed on Sundays)\n"
+            "💰 *Consultation Fee*: ₹500\n\n"
+            "Would you like to book an appointment? Reply *'Available slots tomorrow'* to view open times."
+        )
+
+    if re.search(r'\b(fee|fees|cost|charge|charges|price|payment)\b', msg_lower) and not re.search(r'\b(book|reserve)\b', msg_lower):
+        return (
+            "💰 *Consultation Fee*: ₹500\n\n"
+            "We accept UPI (Google Pay, PhonePe, Paytm), Cards, and Cash at the clinic reception counter."
+        )
+
+    # 4. VIEW ACTIVE BOOKINGS
+    if re.search(r'\b(my appointment|my appointments|what appointment|check booking|active booking|my slot)\b', msg_lower):
+        conn = sqlite3.connect(DB_PATH, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("""
+            SELECT id, patient_name, appointment_time, status 
+            FROM appointments 
+            WHERE patient_phone = ? AND status = 'confirmed'
+            ORDER BY appointment_time ASC
+        """, (clean_phone,))
+        rows = c.fetchall()
+        conn.close()
+
+        if not rows:
+            return "You do not have any active confirmed appointments under this phone number. Reply *'Available slots tomorrow'* to book one!"
+        
+        reply = "📋 *Your Confirmed Appointments*:\n"
+        for r in rows:
+            reply += f"• *{r['patient_name']}*: {r['appointment_time']}\n"
+        reply += "\nReply *'Cancel my appointment'* if you need to cancel or reschedule."
+        return reply
+
+    # 5. CANCELLATION REQUEST
+    if re.search(r'\b(cancel|cancellation)\b', msg_lower):
         success, reply = handle_cancellation(clean_phone)
         return reply
 
-    # 3. CONVERSATION CONTEXT & ACTIVE SESSION LOOKUP
+    # 6. CONVERSATION CONTEXT & ACTIVE SESSION LOOKUP
     session = get_session(clean_phone)
     pending_intent = session.get("pending_intent") if session else None
 
-    # Handle reminder replies (1 = Confirm, 2 = Cancel)
     if pending_intent == "awaiting_reminder_ack":
         if msg_clean == "1":
             update_session(clean_phone, pending_intent=None)
@@ -332,99 +377,105 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
             success, reply = handle_cancellation(clean_phone)
             return f"❌ {reply}"
 
-    # Handle feedback ONLY if patient is explicitly in a feedback flow
-    if pending_intent == "awaiting_feedback" and msg_clean in ["1", "2", "3", "4", "5"]:
-        rating = int(msg_clean)
-        update_session(clean_phone, pending_intent=None)
-        if rating >= 4:
-            return "⭐ Thank you for your feedback! We are glad you had a smooth visit."
-        else:
-            log_staff_escalation(clean_phone, profile_name, f"Low rating received ({rating}/5): Needs follow-up")
-            return "Thank you for sharing your feedback. Our clinic team has noted this and will review it."
-
-    # 4. INTENT: LIST AVAILABLE SLOTS
-    if re.search(r'\b(slot|slots|available|timings?|time)\b', msg_clean.lower()) and not re.search(r'\b(book|reserve)\b', msg_clean.lower()):
+    # 7. INTENT: LIST AVAILABLE SLOTS
+    if re.search(r'\b(slot|slots|available|free slots)\b', msg_lower) and not re.search(r'\b(book|reserve)\b', msg_lower):
         target_date, _, _ = parse_date_and_time(msg_clean)
         if not target_date:
             target_date = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # Verify clinic is not closed on Sunday
+        try:
+            day_obj = datetime.strptime(target_date, "%Y-%m-%d")
+            if day_obj.weekday() == 6: # Sunday
+                next_mon = (day_obj + timedelta(days=1)).strftime("%Y-%m-%d")
+                return f"📅 The clinic is closed on Sundays ({target_date}).\nOur next available working day is Monday ({next_mon}). Reply *'Available slots Monday'* to check slots."
+        except Exception:
+            pass
         
         update_session(clean_phone, last_date=target_date, pending_intent="awaiting_time_selection")
-        return f"📅 Available slots for {target_date}:\n• 10:00 AM\n• 10:30 AM\n• 11:30 AM\n• 04:30 PM\n\nReply with your preferred time to book (e.g., '10:30 AM for {profile_name}')."
+        return f"📅 Available slots for {target_date}:\n• 10:00 AM\n• 10:30 AM\n• 11:30 AM\n• 04:30 PM\n\nReply with your preferred time to book (e.g., 'Book 10:30 AM tomorrow for {profile_name}')."
 
-    # 5. INTENT: BOOK APPOINTMENT
-    target_date, target_time, patient_name = parse_date_and_time(msg_clean)
-    
-    # Use session memory if date was discussed earlier
-    if not target_date and session and session.get("last_date"):
-        target_date = session.get("last_date")
-
-    final_name = patient_name or profile_name or "Patient"
-
-    if target_time:
+    # 8. INTENT: BOOK APPOINTMENT
+    if re.search(r'\b(book|reserve|schedule|appointment)\b', msg_lower) or pending_intent == "awaiting_time_selection":
+        target_date, target_time, patient_name = parse_date_and_time(msg_clean)
+        
+        if not target_date and session and session.get("last_date"):
+            target_date = session.get("last_date")
         if not target_date:
-            update_session(clean_phone, pending_intent="awaiting_date")
-            return f"Got it, {target_time}. Would you like to book this slot for *Today* or *Tomorrow*?"
-        
-        # Verify slot availability and persist
-        appointment_datetime = f"{target_date} {target_time}:00"
-        conn = sqlite3.connect(DB_PATH, timeout=5.0)
-        c = conn.cursor()
-        
-        # Check existing confirmed booking
-        c.execute("SELECT id FROM appointments WHERE appointment_time = ? AND status = 'confirmed'", (appointment_datetime,))
-        exists = c.fetchone()
-        
-        if exists:
-            # Add to waitlist
-            c.execute("""
-                INSERT INTO waitlist (patient_name, patient_phone, preferred_date, preferred_time, status)
-                VALUES (?, ?, ?, ?, 'waiting')
-            """, (final_name, clean_phone, target_date, target_time))
-            conn.commit()
-            conn.close()
-            update_session(clean_phone, pending_intent=None)
-            return (
-                f"⚠️ The {target_time} slot on {target_date} is already reserved.\n"
-                f"You have been placed on the *priority waitlist*. If a cancellation occurs, you will be notified immediately."
-            )
+            target_date = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-        # Slot available -> Confirm booking
-        try:
-            c.execute("""
-                INSERT INTO appointments (patient_name, patient_phone, appointment_time, status, doctor_id)
-                VALUES (?, ?, ?, 'confirmed', 1)
-            """, (final_name, clean_phone, appointment_datetime))
-            conn.commit()
-            update_session(clean_phone, pending_intent=None)
-            return (
-                f"✅ *Appointment Confirmed!*\n\n"
-                f"• Patient: {final_name}\n"
-                f"• Date: {target_date}\n"
-                f"• Time: {target_time}\n"
-                f"• Clinic: Dr. Kurian's Medical Clinic\n" + \
-                f"• Consultation Fee: ₹500\n\n" + \
-                f"💳 *Payment Options:*\n" + \
-                f"1. Tap to pay via UPI (GPay/PhonePe/Paytm):\nupi://pay?pa=drkurian@upi&pn=Dr%20Kurians%20Clinic&am=500&cu=INR&tn=Consultation%20Fee\n" + \
-                f"2. Pay at clinic counter upon arrival (Cash or UPI)\n\n" + \
-                f"To cancel or reschedule, reply 'Cancel'."
+        final_name = patient_name or (profile_name if profile_name != "Patient" else "Patient")
 
-                f"To cancel or reschedule, reply 'Cancel'."
-            )
-        except Exception as e:
-            conn.rollback()
-            return "An unexpected error occurred while booking. Please try again."
-        finally:
-            conn.close()
+        if target_time:
+            # Check Sunday closure
+            try:
+                day_obj = datetime.strptime(target_date, "%Y-%m-%d")
+                if day_obj.weekday() == 6:
+                    return f"❌ The clinic is closed on Sundays ({target_date}). Please choose Monday through Saturday."
+            except Exception:
+                pass
 
-    # 6. DEFAULT FALLBACK
+            appointment_datetime = f"{target_date} {target_time}:00"
+            conn = sqlite3.connect(DB_PATH, timeout=5.0)
+            c = conn.cursor()
+            
+            c.execute("SELECT id FROM appointments WHERE appointment_time = ? AND status = 'confirmed'", (appointment_datetime,))
+            exists = c.fetchone()
+            
+            if exists:
+                c.execute("""
+                    INSERT INTO waitlist (patient_name, patient_phone, preferred_date, preferred_time, status)
+                    VALUES (?, ?, ?, ?, 'waiting')
+                """, (final_name, clean_phone, target_date, target_time))
+                conn.commit()
+                conn.close()
+                update_session(clean_phone, pending_intent=None)
+                return (
+                    f"⚠️ The {target_time} slot on {target_date} is already reserved.\n"
+                    f"You have been placed on the *priority waitlist*. If a cancellation occurs, you will be notified immediately."
+                )
+
+            try:
+                c.execute("""
+                    INSERT INTO appointments (patient_name, patient_phone, appointment_time, status, doctor_id)
+                    VALUES (?, ?, ?, 'confirmed', 1)
+                """, (final_name, clean_phone, appointment_datetime))
+                conn.commit()
+                update_session(clean_phone, pending_intent=None)
+                return (
+                    f"✅ *Appointment Confirmed!*\n\n"
+                    f"• Patient: {final_name}\n"
+                    f"• Date: {target_date}\n"
+                    f"• Time: {target_time}\n"
+                    f"• Clinic: Dr. Kurian's Medical Clinic\n"
+                    f"• Consultation Fee: ₹500\n\n"
+                    f"💳 *Payment Options:*\n"
+                    f"1. Tap to pay via UPI (GPay/PhonePe/Paytm):\nupi://pay?pa=drkurian@upi&pn=Dr%20Kurians%20Clinic&am=500&cu=INR&tn=Consultation%20Fee\n"
+                    f"2. Pay at clinic counter upon arrival (Cash or UPI)\n\n"
+                    f"To check your booking, text 'What appointments do I have booked'. To cancel, reply 'Cancel'."
+                )
+            except Exception as e:
+                conn.rollback()
+                return "An unexpected error occurred while booking. Please try again."
+            finally:
+                conn.close()
+
+    # 9. OUT OF SCOPE / IRRELEVANT
+    if re.search(r'\b(car|engine|crypto|bitcoin|flight|hotel|plumber|mechanic|movie)\b', msg_lower):
+        return (
+            "I am the AI receptionist for Dr. Kurian's Medical Clinic. "
+            "I can assist you with appointment bookings, slot availability, clinic timings, and clinic information. "
+            "How may I assist you with your health visit today?"
+        )
+
+    # 10. DEFAULT FALLBACK
     return (
         f"Hello {profile_name}! Welcome to Dr. Kurian's Medical Clinic.\n\n"
         f"• To check open slots: 'Available slots tomorrow'\n"
         f"• To book: 'Book 10:30 am tomorrow for {profile_name}'\n"
+        f"• To view bookings: 'What appointments do I have booked'\n"
         f"• To cancel: 'Cancel my appointment'"
     )
-
-
 
 def trigger_doctor_briefing():
     """
