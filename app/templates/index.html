@@ -117,6 +117,7 @@
                                 <th class="pb-3 font-semibold">Patient</th>
                                 <th class="pb-3 font-semibold">Phone</th>
                                 <th class="pb-3 font-semibold">Status</th>
+                                <th class="pb-3 font-semibold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="appointments-tbody" class="divide-y divide-slate-800/60">
@@ -215,6 +216,24 @@
             document.getElementById('billingModal').classList.add('hidden');
         }
 
+        
+        async function setApptStatus(apptId, status) {
+            try {
+                const res = await fetch(`/api/appointments/${apptId}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: status })
+                });
+                if (res.ok) {
+                    fetchMetrics();
+                } else {
+                    alert("Failed to update status");
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+        
         async function fetchMetrics() {
             const dateInput = document.getElementById('target_date').value;
             try {
@@ -234,7 +253,15 @@
                             <td class="py-3 font-mono text-indigo-300 font-medium">${escapeHTML(a.time)}</td>
                             <td class="py-3 font-semibold text-white">${escapeHTML(a.patient_name)}</td>
                             <td class="py-3 font-mono text-slate-400">${escapeHTML(a.patient_phone)}</td>
-                            <td class="py-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">${escapeHTML(a.status)}</span></td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${a.status === 'completed' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : (a.status === 'no_show' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30')}">${escapeHTML(a.status)}</span></td>
+                            <td class="py-3 text-right">
+                                ${a.status === 'confirmed' ? `
+                                    <div class="inline-flex gap-1">
+                                        <button onclick="setApptStatus(${a.id}, 'completed')" class="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded text-[11px] font-bold transition">Arrived</button>
+                                        <button onclick="setApptStatus(${a.id}, 'no_show')" class="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded text-[11px] font-bold transition">No-Show</button>
+                                    </div>
+                                ` : `<span class="text-slate-500 text-[11px]">Logged</span>`}
+                            </td>
                         </tr>
                     `).join('');
                 } else {
