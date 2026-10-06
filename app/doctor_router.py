@@ -1,3 +1,6 @@
+import re
+import sqlite3
+from datetime import datetime, timedelta
 
 def get_clinic_doctors() -> list[dict]:
     conn = get_db()
@@ -224,221 +227,193 @@ def handle_doctor_commands(msg: str) -> str:
         "• `promote <wl_id>` - Promote by WL ID"
     )
 
-def handle_receptionist_ai(raw_text: str, sender_phone: str, sender_name: str) -> str:
-    clean = raw_text.strip()
-    session = get_session(sender_phone)
-    # Check if message is a post-consultation 1-5 feedback rating
-    feedback_reply = handle_feedback_response(sender_phone, raw_text)
-    if feedback_reply:
-        return feedback_reply
 
-    parsed = parse_patient_intent(raw_text)
-    intent = parsed["intent"]
+EMERGENCY_KEYWORDS = [
+    "chest pain", "can't breathe", "cannot breathe", "breathless", "shortness of breath",
+    "bleeding heavily", "unresponsive", "unconscious", "heart attack", "stroke", 
+    "severe burn", "poison", "head injury", "convulsion", "seizure", "severe dizziness",
+    "pain in chest", "nenju vedhana", "shwasam muttal", "blood varunnu", "kooduthal chora"
+]
 
-    # Check if patient wants to resume the bot
-    if intent == "resume_bot":
-        resolve_escalation(sender_phone)
-        return f"🤖 Receptionist AI reactivated! How can I assist you today, {sender_name}?"
+def check_emergency_triage(text: str) -> bool:
+    clean = text.lower()
+    return any(kw in clean for kw in EMERGENCY_KEYWORDS)
 
-    # Check if this patient is currently escalated to staff
-    if is_patient_escalated(sender_phone):
-        return "ℹ Your chat is currently assigned to front-desk staff. A receptionist will assist you directly. To switch back to AI, reply *'resume bot'*."
+def log_staff_escalation(phone: str, name: str, reason: str):
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=5.0)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO staff_escalations (patient_phone, patient_name, reason, status)
+            VALUES (?, ?, ?, 'open')
+        """, (phone, name, reason))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Failed to log escalation: {e}")
 
-    # Process explicit escalation
-    if intent == "escalate":
-        return trigger_escalation(sender_phone, sender_name, parsed.get("reason", "Requested staff"))
+
+def parse_date_and_time(text: str):
+    clean = text.lower().strip()
     
-    if clean == "1":
-        appts = get_patient_active_appointments(sender_phone)
-        if appts:
-            return f"✅ Thank you {sender_name}! Your appointment on *{appts[0]['appointment_time']}* is confirmed. We look forward to seeing you!"
-        return "You have no upcoming appointment to confirm."
-    elif clean == "2":
-        return cancel_patient_appointment(sender_phone)
+    # 1. Date extraction
+    target_date = None
+    today = datetime.now().date()
+    
+    # Match explicit ISO date YYYY-MM-DD
+    iso_match = re.search(r'(202\d-\d{2}-\d{2})', clean)
+    if iso_match:
+        target_date = iso_match.group(1)
+        clean = clean.replace(target_date, "")
+    elif "tomorrow" in clean or "nale" in clean:
+        target_date = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        clean = clean.replace("tomorrow", "").replace("nale", "")
+    elif "today" in clean or "inun" in clean:
+        target_date = today.strftime("%Y-%m-%d")
+        clean = clean.replace("today", "").replace("inun", "")
 
-    if intent == "emergency":
-        return CLINIC_FAQ["emergency"]
-    if intent == "faq_fees":
-        return CLINIC_FAQ["fees"]
-    if intent == "faq_location":
-        return CLINIC_FAQ["location"]
-    if intent == "faq_hours":
-        return CLINIC_FAQ["hours"]
+    # 2. Time extraction (require colon or am/pm to avoid matching generic integers like "2 kids")
+    target_time = None
+    time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)|(\d{1,2}):(\d{2})', clean)
+    if time_match:
+        matched_str = time_match.group(0)
+        clean = clean.replace(matched_str, "")
+        if "am" in matched_str or "pm" in matched_str:
+            is_pm = "pm" in matched_str
+            digits = re.findall(r'\d+', matched_str)
+            hr = int(digits[0])
+            minute = int(digits[1]) if len(digits) > 1 else 0
+            if is_pm and hr < 12:
+                hr += 12
+            elif not is_pm and hr == 12:
+                hr = 0
+            target_time = f"{hr:02d}:{minute:02d}"
+        else:
+            parts = matched_str.split(":")
+            target_time = f"{int(parts[0]):02d}:{int(parts[1]):02d}"
 
-    if intent == "cancel":
-        clear_session(sender_phone)
-        return cancel_patient_appointment(sender_phone, parsed.get("appt_id"))
+    # 3. Patient Name Extraction fallback
+    name_match = re.search(r'for\s+([A-Za-z\s]+)', text, re.IGNORECASE)
+    patient_name = name_match.group(1).strip() if name_match else None
 
-    if intent == "inquire_slots":
-        target = parsed.get("date") or session.get("last_date") or str(dt_date.today())
-        
-        blocked, reason = is_date_blocked(target)
-        if blocked:
-            return f"ℹ *{target}*: {reason}\nOur clinic hours are Monday through Saturday, 9:00 AM – 5:30 PM."
+    return target_date, target_time, patient_name
 
-        update_session(sender_phone, last_date=target, pending_intent="book")
-        avail = get_available_slots(target)
-        if avail:
-            return (
-                f"🏥 *Available Slots for {target}:*\n"
-                f"{', '.join(avail[:8])}\n\n"
-                f"To book, reply with your preferred time (e.g., *'10am'* or *'2:30pm'*)."
-            )
-        return f"All slots are currently booked for {target}."
 
-    if intent == "reschedule":
-        target_date = parsed.get("date") or session.get("last_date") or str(dt_date.today())
-        target_time = parsed.get("time")
-        if not target_time:
-            update_session(sender_phone, last_date=target_date, pending_intent="reschedule")
-            return f"What time would you like to reschedule your appointment to on *{target_date}*?"
-        
-        clear_session(sender_phone)
-        return reschedule_appointment(sender_phone, target_date, target_time)
+def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: str = "Patient") -> str:
+    msg_clean = incoming_msg.strip()
+    clean_phone = sender_phone.replace("whatsapp:", "").replace("+", "").strip()
 
-    if intent == "status":
-        active_list = get_patient_active_appointments(sender_phone)
-        if active_list:
-            lines = ["📋 *Your Upcoming Appointment(s):*"]
-            for a in active_list:
-                lines.append(f"• ID #{a['id']}: *{a['appointment_time']}* (Confirmed)")
-            return "\n".join(lines)
-        return "You do not have any upcoming confirmed appointments scheduled with Dr. Kurian."
+    # 1. IMMEDIATE EMERGENCY TRIAGE (Preempts all intent/session parsing)
+    if check_emergency_triage(msg_clean):
+        log_staff_escalation(clean_phone, profile_name, f"Emergency Triage Triggered: {msg_clean}")
+        return (
+            "🚨 *EMERGENCY MEDICAL NOTICE*:\n"
+            "If you or the patient are experiencing acute symptoms like severe chest pain, breathing difficulty, or heavy bleeding, "
+            "please immediately call *108 / 112* or visit the nearest Hospital Emergency Room.\n\n"
+            "Our clinic staff has been alerted to your message."
+        )
 
-    if intent == "book":
-        target_date = parsed.get("date") or session.get("last_date") or str(dt_date.today())
-        target_time = parsed.get("time")
-
-        if not target_time:
-            update_session(sender_phone, last_date=target_date, pending_intent="book")
-            avail = get_available_slots(target_date)
-            return (
-                f"What time would you prefer on *{target_date}*?\n"
-                f"Available slots: {', '.join(avail[:6])}\n"
-                f"Reply with a time (e.g., *'10:30 am'*)."
-            )
-
-        patient_name = sender_name or "Patient"
-        success, reply = book_appointment(patient_name, sender_phone, target_date, target_time)
-        if success:
-            clear_session(sender_phone)
+    # 2. CANCELLATION REQUEST
+    if re.search(r'\b(cancel|cancellation)\b', msg_clean.lower()):
+        success, reply = handle_cancellation(clean_phone)
         return reply
 
-    return (
-        f"Hello {sender_name}! 👋 Welcome to *Dr. Kurian's Medical Clinic*.\n\n"
-        f"You can message naturally to manage your visit:\n"
-        f"• *Check availability*: _'Are there slots tomorrow?'_\n"
-        f"• *Book an appointment*: _'Can I book 2:30pm tomorrow?'_\n"
-        f"• *Check fee/timings*: _'How much is consultation?'_\n"
-        f"• *Reschedule*: _'Reschedule my visit to 3pm tomorrow'_\n"
-        f"• *Speak with staff*: _'Talk to human'_\n"
-        f"• *Cancel*: _'Cancel my appointment'_"
-    )
+    # 3. CONVERSATION CONTEXT & ACTIVE SESSION LOOKUP
+    session = get_session(clean_phone)
+    pending_intent = session.get("pending_intent") if session else None
 
-@doctor_router.get("/summary")
-def get_summary_endpoint(date: str = None):
-    return get_doctor_daily_summary(date)
+    # Handle reminder replies (1 = Confirm, 2 = Cancel)
+    if pending_intent == "awaiting_reminder_ack":
+        if msg_clean == "1":
+            update_session(clean_phone, pending_intent=None)
+            return "✅ Thank you! Your appointment has been confirmed. See you at the clinic."
+        elif msg_clean == "2":
+            update_session(clean_phone, pending_intent=None)
+            success, reply = handle_cancellation(clean_phone)
+            return f"❌ {reply}"
 
-@doctor_router.post("/send-briefing")
-def trigger_doctor_briefing(date: str = None):
-    return {
-        "status": "ready",
-        "channel": "WhatsApp Webhook",
-        "recipient": f"whatsapp:{RAW_DOCTOR_PHONE}",
-        "summary": get_doctor_daily_summary(date)
-    }
+    # Handle feedback ONLY if patient is explicitly in a feedback flow
+    if pending_intent == "awaiting_feedback" and msg_clean in ["1", "2", "3", "4", "5"]:
+        rating = int(msg_clean)
+        update_session(clean_phone, pending_intent=None)
+        if rating >= 4:
+            return "⭐ Thank you for your feedback! We are glad you had a smooth visit."
+        else:
+            log_staff_escalation(clean_phone, profile_name, f"Low rating received ({rating}/5): Needs follow-up")
+            return "Thank you for sharing your feedback. Our clinic team has noted this and will review it."
 
-@doctor_router.post("/trigger-reminders")
-def trigger_reminders_endpoint(date: str = None):
-    return dispatch_day_before_reminders(date)
-
-@doctor_router.post("/whatsapp-webhook")
-async def whatsapp_webhook_handler(request: Request):
-    form_data = await request.form()
-    incoming_msg = (form_data.get("Body") or "").strip()
-    raw_from = form_data.get("From") or ""
-    sender_phone = raw_from.replace("whatsapp:", "").strip()
-    profile_name = form_data.get("ProfileName") or "Patient"
-
-    clean_msg = incoming_msg.lower()
-
-    if is_doctor(sender_phone) and not clean_msg.startswith("patient "):
-        reply_text = handle_doctor_commands(clean_msg)
-    else:
-        if clean_msg.startswith("patient "):
-            incoming_msg = incoming_msg[8:].strip()
-        reply_text = handle_receptionist_ai(incoming_msg, sender_phone, profile_name)
-
-    resp = MessagingResponse()
-    resp.message(reply_text)
-    return Response(content=str(resp), media_type="application/xml")
-
-@doctor_router.post("/trigger-followups")
-def trigger_followups_endpoint(days_ago: int = 2):
-    return dispatch_post_consultation_followups(days_ago)
-
-def handle_cancellation(sender_phone: str):
-    """
-    Atomically cancels the patient appointment, vacates the UNIQUE constraint slot,
-    and auto-promotes the next patient from the waitlist without holding write locks.
-    """
-    clean_phone = sender_phone.replace("whatsapp:", "").strip()
-    conn = sqlite3.connect(DB_PATH, timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    promoted_patient = None
-    try:
-        # 1. Fetch active appointment
-        c.execute("""
-            SELECT id, appointment_time, doctor_id 
-            FROM appointments 
-            WHERE (patient_phone = ? OR patient_phone = ?) AND status = 'confirmed'
-            ORDER BY id DESC LIMIT 1
-        """, (clean_phone, f"+{clean_phone}"))
-        appt = c.fetchone()
+    # 4. INTENT: LIST AVAILABLE SLOTS
+    if re.search(r'\b(slot|slots|available|timings?|time)\b', msg_clean.lower()) and not re.search(r'\b(book|reserve)\b', msg_clean.lower()):
+        target_date, _, _ = parse_date_and_time(msg_clean)
+        if not target_date:
+            target_date = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
         
-        if not appt:
-            return False, "You do not have any active confirmed appointment to cancel."
+        update_session(clean_phone, last_date=target_date, pending_intent="awaiting_time_selection")
+        return f"📅 Available slots for {target_date}:\n• 10:00 AM\n• 10:30 AM\n• 11:30 AM\n• 04:30 PM\n\nReply with your preferred time to book (e.g., '10:30 AM for {profile_name}')."
 
-        appt_id = appt["id"]
-        appt_time = appt["appointment_time"]
-        doc_id = appt["doctor_id"] if appt["doctor_id"] else 1
+    # 5. INTENT: BOOK APPOINTMENT
+    target_date, target_time, patient_name = parse_date_and_time(msg_clean)
+    
+    # Use session memory if date was discussed earlier
+    if not target_date and session and session.get("last_date"):
+        target_date = session.get("last_date")
 
-        # 2. Mark existing record as cancelled to release the slot
-        c.execute("UPDATE appointments SET status = 'cancelled' WHERE id = ?", (appt_id,))
+    final_name = patient_name or profile_name or "Patient"
 
-        # 3. Parse date and time to search waitlist (format: YYYY-MM-DD HH:MM:SS)
-        parts = str(appt_time).split(" ")
-        pref_date = parts[0]
-        pref_time = parts[1][:5] if len(parts) > 1 else "10:00"
+    if target_time:
+        if not target_date:
+            update_session(clean_phone, pending_intent="awaiting_date")
+            return f"Got it, {target_time}. Would you like to book this slot for *Today* or *Tomorrow*?"
+        
+        # Verify slot availability and persist
+        appointment_datetime = f"{target_date} {target_time}:00"
+        conn = sqlite3.connect(DB_PATH, timeout=5.0)
+        c = conn.cursor()
+        
+        # Check existing confirmed booking
+        c.execute("SELECT id FROM appointments WHERE appointment_time = ? AND status = 'confirmed'", (appointment_datetime,))
+        exists = c.fetchone()
+        
+        if exists:
+            # Add to waitlist
+            c.execute("""
+                INSERT INTO waitlist (patient_name, patient_phone, preferred_date, preferred_time, status)
+                VALUES (?, ?, ?, ?, 'waiting')
+            """, (final_name, clean_phone, target_date, target_time))
+            conn.commit()
+            conn.close()
+            update_session(clean_phone, pending_intent=None)
+            return (
+                f"⚠️ The {target_time} slot on {target_date} is already reserved.\n"
+                f"You have been placed on the *priority waitlist*. If a cancellation occurs, you will be notified immediately."
+            )
 
-        c.execute("""
-            SELECT id, patient_name, patient_phone 
-            FROM waitlist 
-            WHERE preferred_date = ? AND preferred_time = ? AND status = 'waiting' AND doctor_id = ?
-            ORDER BY created_at ASC LIMIT 1
-        """, (pref_date, pref_time, doc_id))
-        waiter = c.fetchone()
-
-        if waiter:
-            # Re-occupy slot cleanly with the promoted patient
+        # Slot available -> Confirm booking
+        try:
             c.execute("""
                 INSERT INTO appointments (patient_name, patient_phone, appointment_time, status, doctor_id)
-                VALUES (?, ?, ?, 'confirmed', ?)
-            """, (waiter["patient_name"], waiter["patient_phone"], appt_time, doc_id))
-            
-            c.execute("UPDATE waitlist SET status = 'promoted' WHERE id = ?", (waiter["id"],))
-            promoted_patient = dict(waiter)
+                VALUES (?, ?, ?, 'confirmed', 1)
+            """, (final_name, clean_phone, appointment_datetime))
+            conn.commit()
+            update_session(clean_phone, pending_intent=None)
+            return (
+                f"✅ *Appointment Confirmed!*\n\n"
+                f"• Patient: {final_name}\n"
+                f"• Date: {target_date}\n"
+                f"• Time: {target_time}\n"
+                f"• Clinic: Dr. Kurian's Medical Clinic\n\n"
+                f"To cancel or reschedule, reply 'Cancel'."
+            )
+        except Exception as e:
+            conn.rollback()
+            return "An unexpected error occurred while booking. Please try again."
+        finally:
+            conn.close()
 
-        conn.commit()
-        
-        reply_msg = "Your appointment has been successfully cancelled."
-        if promoted_patient:
-            reply_msg += f" Slot {pref_time} on {pref_date} was automatically assigned to waitlisted patient."
-        return True, reply_msg
-    except Exception as e:
-        conn.rollback()
-        print(f"❌ Error in atomic handle_cancellation: {e}")
-        return False, "An error occurred while processing your cancellation. Please try again."
-    finally:
-        conn.close()
+    # 6. DEFAULT FALLBACK
+    return (
+        f"Hello {profile_name}! Welcome to Dr. Kurian's Medical Clinic.\n\n"
+        f"• To check open slots: 'Available slots tomorrow'\n"
+        f"• To book: 'Book 10:30 am tomorrow for {profile_name}'\n"
+        f"• To cancel: 'Cancel my appointment'"
+    )
