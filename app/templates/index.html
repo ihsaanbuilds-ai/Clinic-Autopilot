@@ -1,212 +1,320 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>ReceptionistAI Pro | Dr. Kurian's Medical Clinic</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReceptionistAI Pro | Dr. Kurian's Medical Clinic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#10b981', 600: '#059669' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0b0f17; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased">
-  <!-- Top Navigation Bar -->
-  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
-          <i class="ph-bold ph-first-aid-kit"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base font-bold text-white tracking-tight leading-none">Dr. Kurian's Clinic</h1>
-            <span class="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">SaaS Live</span>
-          </div>
-          <p class="text-xs text-slate-400 mt-0.5">ReceptionistAI Autonomous Reception</p>
-        </div>
-      </div>
+<body class="p-6 md:p-10 min-h-screen flex flex-col justify-between">
+    <div class="max-w-7xl mx-auto w-full">
+        <!-- Top Nav / Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-6 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-lg">
+                    🩺
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold text-white tracking-tight">Dr. Kurian's Clinic</h1>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">SaaS Live</span>
+                    </div>
+                    <p class="text-xs text-slate-400">ReceptionistAI Autonomous Reception</p>
+                </div>
+            </div>
 
-      <!-- Date Filter & Actions -->
-      <div class="flex items-center gap-3">
-        <div class="flex items-center bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5 shadow-inner">
-          <i class="ph ph-calendar text-slate-400 mr-2 text-base"></i>
-          <input type="date" id="date-select" class="bg-transparent text-sm text-slate-200 outline-none font-medium cursor-pointer">
-        </div>
-        <button onclick="loadDashboard()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
-          <i class="ph-bold ph-arrows-clockwise text-sm"></i> Sync
-        </button>
-      </div>
-    </div>
-  </header>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Plan: <strong>Monthly Pro</strong></span>
+                    <span class="text-slate-500">•</span>
+                    <span id="license-display" class="text-slate-300">Expires in: 30 days</span>
+                </div>
 
-  <!-- Subscription Status Bar -->
-  <div class="bg-slate-800/40 border-b border-slate-700/40 px-4 py-2.5">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-      <div class="flex items-center gap-2 text-slate-300">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>Plan: <strong id="sub-plan" class="text-white">Monthly Pro</strong></span>
-        <span class="text-slate-500">•</span>
-        <span>Expires in: <strong id="sub-days" class="text-emerald-400">30 days</strong></span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button onclick="renewPlan(30)" class="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline flex items-center gap-1">
                 <button onclick="openBillingModal()" class="text-xs text-emerald-300 hover:text-emerald-200 font-bold transition flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 px-3.5 py-1.5 rounded-xl border border-emerald-500/40 shadow-sm cursor-pointer">
-                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                    Manage & Renew Plan (₹4,999)
+                    ⚡ Manage & Renew Plan (₹4,999)
                 </button>
+
+                <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5">
+                    <input type="date" id="target_date" class="bg-transparent text-xs text-slate-200 focus:outline-none cursor-pointer" onchange="fetchMetrics()">
+                </div>
+
+                <button onclick="fetchMetrics()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                    🔄 Sync
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Confirmed Bookings</span>
+                    <span class="text-emerald-400">✓</span>
+                </div>
+                <div id="stat-confirmed" class="text-3xl font-black text-white">0</div>
+                <p class="text-xs text-slate-500 mt-1">Confirmed patient slots</p>
+            </div>
+
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Priority Waitlist</span>
+                    <span class="text-indigo-400">⇄</span>
+                </div>
+                <div id="stat-waitlist" class="text-3xl font-black text-white">0</div>
+                <p class="text-xs text-slate-500 mt-1">Automatic auto-fill queue</p>
+            </div>
+
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cancellations</span>
+                    <span class="text-rose-400">✕</span>
+                </div>
+                <div id="stat-cancellations" class="text-3xl font-black text-white">0</div>
+                <p class="text-xs text-slate-500 mt-1">Recovered or refunded</p>
+            </div>
+
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Human Escalations</span>
+                    <span class="text-amber-400">⚠️</span>
+                </div>
+                <div id="stat-escalations" class="text-3xl font-black text-amber-300">0</div>
+                <p class="text-xs text-slate-500 mt-1">Bot paused for staff reply</p>
+            </div>
         </div>
 
-        <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
-                <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+        <!-- Tables Layout: Appointments & Waitlist -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Active Appointments Card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-indigo-400">📅</span>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Active Appointments</h2>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-800 uppercase tracking-wider text-[11px]">
+                                <th class="pb-3 font-semibold">Time</th>
+                                <th class="pb-3 font-semibold">Patient</th>
+                                <th class="pb-3 font-semibold">Phone</th>
+                                <th class="pb-3 font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointments-tbody" class="divide-y divide-slate-800/60">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-500">No appointments scheduled for this date.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
-                Verify UTR & Extend License (+30 Days)
-            </button>
-        </form>
+
+            <!-- Priority Waitlist Card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-indigo-400">⏱️</span>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Priority Waitlist Queue</h2>
+                    </div>
+                    <span class="text-[11px] text-slate-500">Auto-fill on cancellation</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-800 uppercase tracking-wider text-[11px]">
+                                <th class="pb-3 font-semibold">Queue ID</th>
+                                <th class="pb-3 font-semibold">Patient</th>
+                                <th class="pb-3 font-semibold">Preferred</th>
+                                <th class="pb-3 font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="waitlist-tbody" class="divide-y divide-slate-800/60">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-500">Waitlist is currently empty.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<script>
-function openBillingModal() {
-    document.getElementById('billingModal').classList.remove('hidden');
-}
+    <footer class="mt-12 text-center text-xs text-slate-600">
+        ReceptionistAI Platform • Autonomous Clinic Operations & Smart Receptionist
+    </footer>
 
-function closeBillingModal() {
-    document.getElementById('billingModal').classList.add('hidden');
-}
-
-async function submitRenewalForm(e) {
-    e.preventDefault();
-    const btn = document.getElementById('renew-btn');
-    const utr = document.getElementById('utr_number').value.trim();
-    
-    if (utr.length < 8) {
-        alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
-        return;
-    }
-
-    btn.innerText = "Verifying Transaction...";
-    btn.disabled = true;
-
-    try {
-        const formData = new FormData();
-        formData.append('clinic_slug', 'dr-kurian-clinic');
-        formData.append('utr_number', utr);
-
-        const res = await fetch('/api/subscription/submit-payment', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            alert("🎉 " + data.message);
-            closeBillingModal();
-            window.location.reload();
-        } else {
-            alert("⚠️️ " + (data.detail || "Verification failed. Please check the UTR."));
-        }
-    } catch(err) {
-        alert("Server error processing verification.");
-    } finally {
-        btn.innerText = "Verify UTR & Extend License (+30 Days)";
-        btn.disabled = false;
-    }
-}
-</script>
-
-
-<!-- Professional SaaS Billing & Dynamic UPI QR Modal -->
-<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
-        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
-        
-        <div class="text-center mb-5">
-            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
-            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
-            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
-        </div>
-
-        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
-            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
-                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
+    <!-- Billing / QR Modal -->
+    <div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
+            <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
+            
+            <div class="text-center mb-5">
+                <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
+                <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
+                <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
             </div>
-            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
-            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
-                <span>📱 Tap here to pay directly on mobile</span>
-            </a>
-        </div>
 
-        <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
-                <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+            <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
+                <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
+                    <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
+                </div>
+                <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
+                <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
+                    <span>📱 Tap here to pay directly on mobile</span>
+                </a>
             </div>
-            <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
-                Verify UTR & Extend License (+30 Days)
-            </button>
-        </form>
+
+            <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
+                    <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+                </div>
+                <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
+                    Verify UTR & Extend License (+30 Days)
+                </button>
+            </form>
+        </div>
     </div>
-</div>
 
-<script>
-function openBillingModal() {
-    const modal = document.getElementById('billingModal');
-    if (modal) modal.classList.remove('hidden');
-}
-
-function closeBillingModal() {
-    const modal = document.getElementById('billingModal');
-    if (modal) modal.classList.add('hidden');
-}
-
-async function submitRenewalForm(e) {
-    e.preventDefault();
-    const btn = document.getElementById('renew-btn');
-    const utr = document.getElementById('utr_number').value.trim();
-    
-    if (utr.length < 8) {
-        alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
-        return;
-    }
-
-    btn.innerText = "Verifying Transaction...";
-    btn.disabled = true;
-
-    try {
-        const formData = new FormData();
-        formData.append('clinic_slug', 'dr-kurian-clinic');
-        formData.append('utr_number', utr);
-
-        const res = await fetch('/api/subscription/submit-payment', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            alert("🎉 " + data.message);
-            closeBillingModal();
-            window.location.reload();
-        } else {
-            alert("⚠️ " + (data.detail || "Verification failed. Please check the UTR."));
+    <!-- Scripts -->
+    <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
-    } catch(err) {
-        alert("Server error processing verification.");
-    } finally {
-        btn.innerText = "Verify UTR & Extend License (+30 Days)";
-        btn.disabled = false;
-    }
-}
-</script>
 
+        function openBillingModal() {
+            document.getElementById('billingModal').classList.remove('hidden');
+        }
+
+        function closeBillingModal() {
+            document.getElementById('billingModal').classList.add('hidden');
+        }
+
+        async function fetchMetrics() {
+            const dateInput = document.getElementById('target_date').value;
+            try {
+                const res = await fetch(`/api/dashboard/metrics?target_date=${dateInput}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('stat-confirmed').innerText = data.confirmed_count || 0;
+                document.getElementById('stat-waitlist').innerText = data.waitlist_count || 0;
+                document.getElementById('stat-cancellations').innerText = data.cancelled_count || 0;
+                document.getElementById('stat-escalations').innerText = data.escalation_count || 0;
+
+                const apptTbody = document.getElementById('appointments-tbody');
+                if (data.appointments && data.appointments.length > 0) {
+                    apptTbody.innerHTML = data.appointments.map(a => `
+                        <tr class="hover:bg-slate-800/40 transition">
+                            <td class="py-3 font-mono text-indigo-300 font-medium">${escapeHTML(a.time)}</td>
+                            <td class="py-3 font-semibold text-white">${escapeHTML(a.patient_name)}</td>
+                            <td class="py-3 font-mono text-slate-400">${escapeHTML(a.patient_phone)}</td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">${escapeHTML(a.status)}</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    apptTbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-500">No appointments scheduled for this date.</td></tr>`;
+                }
+
+                const waitTbody = document.getElementById('waitlist-tbody');
+                if (data.waitlist && data.waitlist.length > 0) {
+                    waitTbody.innerHTML = data.waitlist.map(w => `
+                        <tr class="hover:bg-slate-800/40 transition">
+                            <td class="py-3 font-mono text-slate-400">#${escapeHTML(w.id)}</td>
+                            <td class="py-3 font-semibold text-white">${escapeHTML(w.patient_name)}</td>
+                            <td class="py-3 text-slate-300">${escapeHTML(w.preferred_time || 'Any')}</td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">${escapeHTML(w.status)}</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    waitTbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-500">Waitlist is currently empty.</td></tr>`;
+                }
+            } catch (err) {
+                console.error("Failed to load metrics", err);
+            }
+        }
+
+        async function loadLicenseStatus() {
+            try {
+                const res = await fetch('/api/subscription/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                document.getElementById('license-display').innerText = `Expires in: ${data.days_remaining} days`;
+            } catch (err) {
+                console.error("License check error", err);
+            }
+        }
+
+        async function submitRenewalForm(e) {
+            e.preventDefault();
+            const btn = document.getElementById('renew-btn');
+            const utr = document.getElementById('utr_number').value.trim();
+
+            if (utr.length < 8) {
+                alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
+                return;
+            }
+
+            btn.innerText = "Verifying Transaction...";
+            btn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('clinic_slug', 'dr-kurian-clinic');
+                formData.append('utr_number', utr);
+
+                const res = await fetch('/api/subscription/submit-payment', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert("🎉 " + data.message);
+                    closeBillingModal();
+                    loadLicenseStatus();
+                } else {
+                    alert("⚠️ " + (data.detail || "Verification failed. Please check the UTR."));
+                }
+            } catch (err) {
+                alert("Server error processing verification.");
+            } finally {
+                btn.innerText = "Verify UTR & Extend License (+30 Days)";
+                btn.disabled = false;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('target_date').value = today;
+            fetchMetrics();
+            loadLicenseStatus();
+        });
+    </script>
 </body>
 </html>
