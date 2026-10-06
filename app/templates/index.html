@@ -1,249 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dr. Kurian's Clinic - AutoPilot Console</title>
+  <meta charset="UTF-8">
+  <title>ReceptionistAI Pro | Dr. Kurian's Medical Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <header class="bg-indigo-700 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">🩺 Dr. Kurian's Medical Clinic</h1>
-        <p class="text-indigo-200 text-sm">Automated WhatsApp & Scheduling Command Hub</p>
-      </div>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased">
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Backend Online
-        </span>
-        <button onclick="refreshData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition">
-          🔄 Refresh
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
+          <i class="ph-bold ph-first-aid-kit"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-white tracking-tight leading-none">Dr. Kurian's Clinic</h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">SaaS Live</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">ReceptionistAI Autonomous Reception</p>
+        </div>
+      </div>
+
+      <!-- Date Filter & Actions -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5 shadow-inner">
+          <i class="ph ph-calendar text-slate-400 mr-2 text-base"></i>
+          <input type="date" id="date-select" class="bg-transparent text-sm text-slate-200 outline-none font-medium cursor-pointer">
+        </div>
+        <button onclick="loadDashboard()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
+          <i class="ph-bold ph-arrows-clockwise text-sm"></i> Sync
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Left 2 Cols: Appointments & Waitlist -->
-    <section class="lg:col-span-2 space-y-6">
-      <!-- Confirmed Appointments -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-            📅 Confirmed Appointments (<span id="appt-count">0</span>)
-          </h2>
-          <span class="text-xs font-mono text-slate-500" id="current-date">Today</span>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 uppercase text-xs">
-              <tr>
-                <th class="py-2.5 px-3">ID</th>
-                <th class="py-2.5 px-3">Time</th>
-                <th class="py-2.5 px-3">Patient</th>
-                <th class="py-2.5 px-3">Phone</th>
-                <th class="py-2.5 px-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody id="appts-table" class="divide-y divide-slate-100 font-normal">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading appointments...</td></tr>
-            </tbody>
-          </table>
-        </div>
+  <!-- Subscription Status Bar -->
+  <div class="bg-slate-800/40 border-b border-slate-700/40 px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2 text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Plan: <strong id="sub-plan" class="text-white">Monthly Pro</strong></span>
+        <span class="text-slate-500">•</span>
+        <span>Expires in: <strong id="sub-days" class="text-emerald-400">30 days</strong></span>
       </div>
-
-      <!-- Waitlist Queue -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-            ⏳ Live Waitlist Queue (<span id="wl-count">0</span>)
-          </h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 uppercase text-xs">
-              <tr>
-                <th class="py-2.5 px-3">WL ID</th>
-                <th class="py-2.5 px-3">Patient</th>
-                <th class="py-2.5 px-3">Phone</th>
-                <th class="py-2.5 px-3">Target Time</th>
-                <th class="py-2.5 px-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody id="waitlist-table" class="divide-y divide-slate-100 font-normal">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">No patients waiting.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Right Col: Interactive Simulator / Testing -->
-    <aside class="space-y-6">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <h2 class="text-lg font-bold text-slate-800 mb-3">💬 WhatsApp Quick Test</h2>
-        <p class="text-xs text-slate-500 mb-4">Test patient booking or doctor commands directly without using your phone data.</p>
-        
-        <div class="space-y-3">
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Sender Role / Phone</label>
-            <select id="sim-sender" class="w-full mt-1 border border-slate-300 rounded-lg p-2 text-sm">
-              <option value="+918928740867">Doctor (+918928740867)</option>
-              <option value="+919876543210">Patient Alice (+919876543210)</option>
-              <option value="+919988776655">Patient Bob (+919988776655)</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Command / Message</label>
-            <input id="sim-body" type="text" placeholder="e.g. today, slots, book 10:00" class="w-full mt-1 border border-slate-300 rounded-lg p-2 text-sm font-mono" />
-          </div>
-          <button onclick="sendSimulatedMessage()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-lg text-sm transition">
-            Send Message 🚀
-          </button>
-        </div>
-
-        <div class="mt-4 pt-4 border-t border-slate-200">
-          <label class="text-xs font-semibold text-slate-700">Raw Assistant Response:</label>
-          <pre id="sim-response" class="mt-1 bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono whitespace-pre-wrap max-h-56 overflow-y-auto">Responses will appear here...</pre>
-        </div>
-      </div>
-    </aside>
-  </main>
-
-  <script>
-
-    function escapeHTML(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    async function refreshData() {
-      try {
-        const res = await fetch('/api/doctor/summary');
-        const data = await res.json();
-        
-        document.getElementById('current-date').innerText = data.date;
-        document.getElementById('appt-count').innerText = data.total_confirmed;
-        document.getElementById('wl-count').innerText = data.total_waitlisted;
-
-        // Populate Appointments
-        const apptTbody = document.getElementById('appts-table');
-        if (data.schedule && data.schedule.length > 0) {
-          apptTbody.innerHTML = data.schedule.map(a => `
-            <tr class="hover:bg-slate-50">
-              <td class="py-2.5 px-3 font-semibold text-slate-700">#${a.id}</td>
-              <td class="py-2.5 px-3 text-indigo-600 font-medium">${a.time.split(' ')[1] || a.time}</td>
-              <td class="py-2.5 px-3">${a.name}</td>
-              <td class="py-2.5 px-3 text-slate-500 font-mono text-xs">${a.phone}</td>
-              <td class="py-2.5 px-3 text-right">
-                <button onclick="cancelAppt(${a.id})" class="text-xs text-rose-600 hover:text-rose-800 font-semibold bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded border border-rose-200">
-                  Cancel
+      <div class="flex items-center gap-2">
+        <button onclick="renewPlan(30)" class="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline flex items-center gap-1">
+                <button onclick="openBillingModal()" class="text-xs text-emerald-300 hover:text-emerald-200 font-bold transition flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 px-3.5 py-1.5 rounded-xl border border-emerald-500/40 shadow-sm cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Manage & Renew Plan (₹4,999)
                 </button>
-              </td>
-            </tr>
-          `).join('');
-        } else {
-          apptTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No bookings scheduled for today.</td></tr>';
-        }
-
-        // Populate Waitlist
-        const wlTbody = document.getElementById('waitlist-table');
-        if (data.waitlist && data.waitlist.length > 0) {
-          wlTbody.innerHTML = data.waitlist.map(w => `
-            <tr class="hover:bg-slate-50">
-              <td class="py-2.5 px-3 font-semibold text-amber-700">WL #${w.id}</td>
-              <td class="py-2.5 px-3">${w.patient_name}</td>
-              <td class="py-2.5 px-3 text-slate-500 font-mono text-xs">${w.patient_phone}</td>
-              <td class="py-2.5 px-3 text-slate-600">${w.preferred_time}</td>
-              <td class="py-2.5 px-3 text-right">
-                <button onclick="promoteCandidate(${w.id})" class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200">
-                  Promote
-                </button>
-              </td>
-            </tr>
-          `).join('');
-        } else {
-          wlTbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No patients waiting in queue.</td></tr>';
-        }
-      } catch (err) {
-        console.error("Failed fetching summary:", err);
-      }
-    }
-
-    async function cancelAppt(id) {
-      if (!confirm(`Cancel appointment #${id}?`)) return;
-      await sendWebhookRequest(`cancel ${id}`, '+918928740867');
-      refreshData();
-    }
-
-    async function promoteCandidate(id) {
-      await sendWebhookRequest(`promote ${id}`, '+918928740867');
-      refreshData();
-    }
-
-    async function sendSimulatedMessage() {
-      const body = document.getElementById('sim-body').value.trim();
-      const sender = document.getElementById('sim-sender').value;
-      if (!body) return;
-      await sendWebhookRequest(body, sender);
-      refreshData();
-    }
-
-    async function sendWebhookRequest(body, sender) {
-      const respBox = document.getElementById('sim-response');
-      respBox.innerText = "Processing...";
-      
-      const formData = new URLSearchParams();
-      formData.append('Body', body);
-      formData.append('From', `whatsapp:${sender}`);
-      formData.append('ProfileName', sender.includes('8928') ? 'Dr. Kurian' : 'Patient');
-
-      try {
-        const res = await fetch('/api/doctor/whatsapp-webhook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString()
-        });
-        const xml = await res.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(xml, "application/xml");
-        const msg = doc.querySelector("Message") ? doc.querySelector("Message").textContent : xml;
-        respBox.innerText = msg;
-      } catch (err) {
-        respBox.innerText = "Error: " + err.message;
-      }
-    }
-
-    // Auto-refresh every 5 seconds
-    refreshData();
-    setInterval(refreshData, 5000);
-  </script>
-
-<!-- Professional SaaS Billing & QR Modal -->
-<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
-        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold">&times;</button>
-        
-        <div class="text-center mb-5">
-            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
-            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
-            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
-        </div>
-
-        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
-            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
-                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-44 h-44 object-contain">
-            </div>
-            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or any UPI App</p>
-            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
-                <span>📱 Tap here to pay directly from phone</span>
-            </a>
         </div>
 
         <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
@@ -265,6 +81,91 @@ function openBillingModal() {
 
 function closeBillingModal() {
     document.getElementById('billingModal').classList.add('hidden');
+}
+
+async function submitRenewalForm(e) {
+    e.preventDefault();
+    const btn = document.getElementById('renew-btn');
+    const utr = document.getElementById('utr_number').value.trim();
+    
+    if (utr.length < 8) {
+        alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
+        return;
+    }
+
+    btn.innerText = "Verifying Transaction...";
+    btn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('clinic_slug', 'dr-kurian-clinic');
+        formData.append('utr_number', utr);
+
+        const res = await fetch('/api/subscription/submit-payment', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert("🎉 " + data.message);
+            closeBillingModal();
+            window.location.reload();
+        } else {
+            alert("⚠️️ " + (data.detail || "Verification failed. Please check the UTR."));
+        }
+    } catch(err) {
+        alert("Server error processing verification.");
+    } finally {
+        btn.innerText = "Verify UTR & Extend License (+30 Days)";
+        btn.disabled = false;
+    }
+}
+</script>
+
+
+<!-- Professional SaaS Billing & Dynamic UPI QR Modal -->
+<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
+        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
+        
+        <div class="text-center mb-5">
+            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
+            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
+            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
+            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
+                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
+            </div>
+            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
+            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
+                <span>📱 Tap here to pay directly on mobile</span>
+            </a>
+        </div>
+
+        <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
+                <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+            </div>
+            <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
+                Verify UTR & Extend License (+30 Days)
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openBillingModal() {
+    const modal = document.getElementById('billingModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeBillingModal() {
+    const modal = document.getElementById('billingModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 async function submitRenewalForm(e) {
