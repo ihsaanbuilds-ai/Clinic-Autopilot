@@ -401,7 +401,13 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
                 f"• Patient: {final_name}\n"
                 f"• Date: {target_date}\n"
                 f"• Time: {target_time}\n"
-                f"• Clinic: Dr. Kurian's Medical Clinic\n\n"
+                f"• Clinic: Dr. Kurian's Medical Clinic\n" + \
+                f"• Consultation Fee: ₹500\n\n" + \
+                f"💳 *Payment Options:*\n" + \
+                f"1. Tap to pay via UPI (GPay/PhonePe/Paytm):\nupi://pay?pa=drkurian@upi&pn=Dr%20Kurians%20Clinic&am=500&cu=INR&tn=Consultation%20Fee\n" + \
+                f"2. Pay at clinic counter upon arrival (Cash or UPI)\n\n" + \
+                f"To cancel or reschedule, reply 'Cancel'."
+
                 f"To cancel or reschedule, reply 'Cancel'."
             )
         except Exception as e:
