@@ -54,332 +54,12 @@
       </div>
       <div class="flex items-center gap-2">
         <button onclick="renewPlan(30)" class="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline flex items-center gap-1">
-          <i class="ph-bold ph-credit-card"></i> Extend / Pay Plan (₹4,999)
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
-    <!-- Notice Banner for Doctor Leave / Blocked Dates -->
-    <div id="block-banner" class="hidden bg-rose-950/60 border border-rose-500/40 p-4 rounded-xl flex items-center justify-between text-rose-200 shadow-lg">
-      <div class="flex items-center gap-3">
-        <i class="ph-fill ph-warning-circle text-rose-400 text-2xl"></i>
-        <div>
-          <h4 class="font-bold text-sm text-white">Date Blocked by Doctor</h4>
-          <p class="text-xs text-rose-300" id="block-reason">Dr. Kurian has placed a hold on this day.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Metric KPI Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center justify-between text-slate-400 mb-2">
-          <span class="text-xs font-semibold uppercase tracking-wider">Confirmed Bookings</span>
-          <i class="ph-duotone ph-check-circle text-emerald-400 text-xl"></i>
-        </div>
-        <div class="text-3xl font-extrabold text-white" id="metric-confirmed">0</div>
-        <p class="text-[11px] text-slate-400 mt-1">Confirmed patient slots</p>
-      </div>
-
-      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center justify-between text-slate-400 mb-2">
-          <span class="text-xs font-semibold uppercase tracking-wider">Priority Waitlist</span>
-          <i class="ph-duotone ph-queue text-indigo-400 text-xl"></i>
-        </div>
-        <div class="text-3xl font-extrabold text-white" id="metric-waitlist">0</div>
-        <p class="text-[11px] text-slate-400 mt-1">Automatic auto-fill queue</p>
-      </div>
-
-      <div class="bg-slate-800/70 border border-slate-700/60 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center justify-between text-slate-400 mb-2">
-          <span class="text-xs font-semibold uppercase tracking-wider">Cancellations</span>
-          <i class="ph-duotone ph-x-circle text-rose-400 text-xl"></i>
-        </div>
-        <div class="text-3xl font-extrabold text-white" id="metric-cancelled">0</div>
-        <p class="text-[11px] text-slate-400 mt-1">Recovered or refunded</p>
-      </div>
-
-      <div class="bg-slate-800/70 border border-amber-500/40 bg-amber-500/5 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center justify-between text-amber-400 mb-2">
-          <span class="text-xs font-semibold uppercase tracking-wider">Human Escalations</span>
-          <i class="ph-duotone ph-user-switch text-amber-400 text-xl"></i>
-        </div>
-        <div class="text-3xl font-extrabold text-amber-400" id="metric-escalations">0</div>
-        <p class="text-[11px] text-amber-300/70 mt-1">Bot paused for staff reply</p>
-      </div>
-    </div>
-
-    <!-- Active Human Escalations Container (Pops up when active) -->
-    <div id="escalation-container" class="hidden bg-amber-950/40 border border-amber-500/50 rounded-2xl p-5 shadow-xl">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2.5">
-          <span class="relative flex h-3 w-3">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-          </span>
-          <h2 class="text-base font-bold text-amber-200">Staff Intervention Required</h2>
-          <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30" id="escalation-badge">0 Pending</span>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-amber-900/60 text-xs">
-          <thead>
-            <tr class="text-slate-400 text-left uppercase tracking-wider">
-              <th class="py-2.5 px-3 font-semibold">Patient</th>
-              <th class="py-2.5 px-3 font-semibold">Phone</th>
-              <th class="py-2.5 px-3 font-semibold">Reason</th>
-              <th class="py-2.5 px-3 font-semibold">Triggered At</th>
-              <th class="py-2.5 px-3 text-right font-semibold">Action</th>
-            </tr>
-          </thead>
-          <tbody id="escalations-tbody" class="divide-y divide-amber-900/40 text-slate-200">
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Operations Panel (Appointments + Waitlist) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Appointments Table -->
-      <div class="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-5 flex flex-col shadow-sm">
-        <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-2">
-            <i class="ph-bold ph-calendar-check text-indigo-400 text-lg"></i>
-            <h3 class="text-sm font-bold text-white tracking-tight">Active Appointments</h3>
-          </div>
-          <button onclick="blockCurrentDate()" class="text-[11px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg transition font-medium">
-            Block Selected Day
-          </button>
-        </div>
-        <div class="overflow-x-auto flex-1">
-          <table class="min-w-full divide-y divide-slate-700/60 text-xs">
-            <thead>
-              <tr class="text-slate-400 text-left uppercase tracking-wider">
-                <th class="py-2 px-3 font-semibold">Time</th>
-                <th class="py-2 px-3 font-semibold">Patient</th>
-                <th class="py-2 px-3 font-semibold">Phone</th>
-                <th class="py-2 px-3 font-semibold">Status</th>
-                <th class="py-2 px-3 text-right font-semibold">Action</th>
-              </tr>
-            </thead>
-            <tbody id="appointments-tbody" class="divide-y divide-slate-700/40 text-slate-300">
-              <tr><td colspan="5" class="py-6 text-center text-slate-500">Loading appointments...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Priority Waitlist -->
-      <div class="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-5 flex flex-col shadow-sm">
-        <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-2">
-            <i class="ph-bold ph-clock-countdown text-indigo-400 text-lg"></i>
-            <h3 class="text-sm font-bold text-white tracking-tight">Priority Waitlist Queue</h3>
-          </div>
-          <span class="text-[11px] text-slate-400 font-medium">Auto-fill on cancellation</span>
-        </div>
-        <div class="overflow-x-auto flex-1">
-          <table class="min-w-full divide-y divide-slate-700/60 text-xs">
-            <thead>
-              <tr class="text-slate-400 text-left uppercase tracking-wider">
-                <th class="py-2 px-3 font-semibold">Queue ID</th>
-                <th class="py-2 px-3 font-semibold">Patient</th>
-                <th class="py-2 px-3 font-semibold">Preferred</th>
-                <th class="py-2 px-3 font-semibold">Status</th>
-                <th class="py-2 px-3 text-right font-semibold">Action</th>
-              </tr>
-            </thead>
-            <tbody id="waitlist-tbody" class="divide-y divide-slate-700/40 text-slate-300">
-              <tr><td colspan="5" class="py-6 text-center text-slate-500">Loading waitlist...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-slate-500 text-xs">
-    ReceptionistAI Platform • Autonomous Clinic Operations & Smart Receptionist
-  </footer>
-
-  <script>
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('date-select').value = today;
-
-    async function loadDashboard() {
-      const selectedDate = document.getElementById('date-select').value;
-      try {
-        // Fetch dashboard metrics
-        const res = await fetch(`/api/dashboard/metrics?target_date=${selectedDate}`);
-        const data = await res.json();
-
-        // Fetch subscription status
-        const subRes = await fetch('/api/dashboard/subscription');
-        const subData = await subRes.json();
-        document.getElementById('sub-plan').innerText = subData.plan_name || 'Standard';
-        document.getElementById('sub-days').innerText = `${subData.days_remaining} days left`;
-
-        // Update KPIs
-        document.getElementById('metric-confirmed').innerText = data.summary.confirmed;
-        document.getElementById('metric-waitlist').innerText = data.summary.waitlisted;
-        document.getElementById('metric-cancelled').innerText = data.summary.cancelled;
-        document.getElementById('metric-escalations').innerText = data.summary.escalations;
-
-        // Block Notice
-        const banner = document.getElementById('block-banner');
-        if (data.is_blocked) {
-          banner.classList.remove('hidden');
-          document.getElementById('block-reason').innerText = data.block_reason;
-        } else {
-          banner.classList.add('hidden');
-        }
-
-        // Escalations
-        const escContainer = document.getElementById('escalation-container');
-        const escTbody = document.getElementById('escalations-tbody');
-        if (data.escalations && data.escalations.length > 0) {
-          escContainer.classList.remove('hidden');
-          document.getElementById('escalation-badge').innerText = `${data.escalations.length} Pending`;
-          escTbody.innerHTML = data.escalations.map(e => `
-            <tr class="hover:bg-amber-500/10 transition">
-              <td class="py-2.5 px-3 font-bold text-white">${e.patient_name}</td>
-              <td class="py-2.5 px-3 font-mono text-slate-400">${e.patient_phone}</td>
-              <td class="py-2.5 px-3 text-amber-200">${e.reason}</td>
-              <td class="py-2.5 px-3 text-slate-400">${e.created_at}</td>
-              <td class="py-2.5 px-3 text-right">
-                <button onclick="resolveEscalation('${e.patient_phone}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2.5 py-1 rounded transition shadow-sm text-xs">
-                  Resolve & Resume AI
+                <button onclick="openBillingModal()" class="text-xs text-emerald-300 hover:text-emerald-200 font-bold transition flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 px-3.5 py-1.5 rounded-xl border border-emerald-500/40 shadow-sm cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Manage & Renew Plan (₹4,999)
                 </button>
-              </td>
-            </tr>
-          `).join('');
-        } else {
-          escContainer.classList.add('hidden');
-        }
-
-        // Appointments Table
-        const apptTbody = document.getElementById('appointments-tbody');
-        if (data.appointments.length === 0) {
-          apptTbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">No appointments scheduled for this date.</td></tr>';
-        } else {
-          apptTbody.innerHTML = data.appointments.map(a => {
-            const timeStr = a.appointment_time.split(' ')[1] ? a.appointment_time.split(' ')[1].substring(0, 5) : a.appointment_time;
-            const isConfirmed = a.status === 'confirmed';
-            return `
-              <tr class="hover:bg-slate-700/30 transition">
-                <td class="py-2.5 px-3 font-bold text-white">${timeStr}</td>
-                <td class="py-2.5 px-3 font-medium text-slate-200">${a.patient_name}</td>
-                <td class="py-2.5 px-3 text-slate-400 font-mono">${a.patient_phone}</td>
-                <td class="py-2.5 px-3">
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isConfirmed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}">
-                    ${a.status}
-                  </span>
-                </td>
-                <td class="py-2.5 px-3 text-right">
-                  ${isConfirmed ? `<button onclick="cancelAppt(${a.id})" class="text-rose-400 hover:text-rose-300 font-medium hover:underline text-xs">Cancel</button>` : '-'}
-                </td>
-              </tr>
-            `;
-          }).join('');
-        }
-
-        // Waitlist Table
-        const wlTbody = document.getElementById('waitlist-tbody');
-        if (data.waitlist.length === 0) {
-          wlTbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Waitlist is currently empty.</td></tr>';
-        } else {
-          wlTbody.innerHTML = data.waitlist.map(w => {
-            const isWaiting = w.status === 'waiting';
-            return `
-              <tr class="hover:bg-slate-700/30 transition">
-                <td class="py-2.5 px-3 font-mono text-slate-400">#${w.id}</td>
-                <td class="py-2.5 px-3 font-semibold text-white">${w.patient_name}</td>
-                <td class="py-2.5 px-3 text-slate-300">${w.preferred_time}</td>
-                <td class="py-2.5 px-3">
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isWaiting ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-slate-700 text-slate-400'}">
-                    ${w.status}
-                  </span>
-                </td>
-                <td class="py-2.5 px-3 text-right">
-                  ${isWaiting ? `<button onclick="promoteCandidate(${w.id}, '${w.preferred_time}')" class="text-indigo-400 hover:text-indigo-300 font-medium hover:underline text-xs">Promote</button>` : '-'}
-                </td>
-              </tr>
-            `;
-          }).join('');
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard:', err);
-      }
-    }
-
-    async function renewPlan(days) {
-      if (!confirm(`Process subscription extension for ${days} days (₹4,999)?`)) return;
-      await fetch(`/api/dashboard/subscription/renew?days=${days}`, { method: 'POST' });
-      alert('✅ Plan successfully renewed!');
-      loadDashboard();
-    }
-
-    async function resolveEscalation(phone) {
-      await fetch('/api/dashboard/resolve-escalation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
-      });
-      loadDashboard();
-    }
-
-    async function cancelAppt(id) {
-      if (!confirm(`Cancel appointment #${id}? This will auto-promote waitlisted patients if available.`)) return;
-      await fetch(`/api/dashboard/cancel/${id}`, { method: 'POST' });
-      loadDashboard();
-    }
-
-    async function promoteCandidate(id, time) {
-      if (!confirm(`Manually promote Waitlist #${id} to ${time}?`)) return;
-      await fetch('/api/dashboard/promote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ waitlist_id: id, slot_time: time })
-      });
-      loadDashboard();
-    }
-
-    async function blockCurrentDate() {
-      const selectedDate = document.getElementById('date-select').value;
-      if (!confirm(`Block all bookings for ${selectedDate}?`)) return;
-      await fetch('/api/dashboard/block-date', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: selectedDate })
-      });
-      loadDashboard();
-    }
-
-    loadDashboard();
-    setInterval(loadDashboard, 10000);
-  </script>
-
-<!-- Professional SaaS Billing & Dynamic UPI QR Modal -->
-<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
-        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
-        
-        <div class="text-center mb-5">
-            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
-            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
-            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
-        </div>
-
-        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
-            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
-                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
-            </div>
-            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
-            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
-                <span>📱 Tap here to pay directly on mobile</span>
-            </a>
         </div>
 
         <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
@@ -433,6 +113,91 @@ async function submitRenewalForm(e) {
             window.location.reload();
         } else {
             alert("⚠️️ " + (data.detail || "Verification failed. Please check the UTR."));
+        }
+    } catch(err) {
+        alert("Server error processing verification.");
+    } finally {
+        btn.innerText = "Verify UTR & Extend License (+30 Days)";
+        btn.disabled = false;
+    }
+}
+</script>
+
+
+<!-- Professional SaaS Billing & Dynamic UPI QR Modal -->
+<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
+        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
+        
+        <div class="text-center mb-5">
+            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
+            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
+            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
+            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
+                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
+            </div>
+            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
+            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
+                <span>📱 Tap here to pay directly on mobile</span>
+            </a>
+        </div>
+
+        <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
+                <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+            </div>
+            <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
+                Verify UTR & Extend License (+30 Days)
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openBillingModal() {
+    const modal = document.getElementById('billingModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeBillingModal() {
+    const modal = document.getElementById('billingModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitRenewalForm(e) {
+    e.preventDefault();
+    const btn = document.getElementById('renew-btn');
+    const utr = document.getElementById('utr_number').value.trim();
+    
+    if (utr.length < 8) {
+        alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
+        return;
+    }
+
+    btn.innerText = "Verifying Transaction...";
+    btn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('clinic_slug', 'dr-kurian-clinic');
+        formData.append('utr_number', utr);
+
+        const res = await fetch('/api/subscription/submit-payment', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert("🎉 " + data.message);
+            closeBillingModal();
+            window.location.reload();
+        } else {
+            alert("⚠️ " + (data.detail || "Verification failed. Please check the UTR."));
         }
     } catch(err) {
         alert("Server error processing verification.");
