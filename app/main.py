@@ -1,3 +1,17 @@
+from app.billing_router import billing_router
+
+from fastapi import Header, HTTPException, status
+import os
+
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "clinic-pilot-secure-key-2026")
+
+def verify_admin_key(x_admin_secret: str = Header(None)):
+    if x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Invalid or missing X-Admin-Secret header"
+        )
+
 from app.voice_router import voice_router
 import os
 from fastapi import FastAPI
@@ -33,3 +47,5 @@ def on_startup():
 @app.on_event("shutdown")
 def on_shutdown():
     shutdown_scheduler()
+
+app.include_router(billing_router)
