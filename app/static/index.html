@@ -360,5 +360,88 @@
     loadDashboard();
     setInterval(loadDashboard, 10000);
   </script>
+
+<!-- Professional SaaS Billing & Dynamic UPI QR Modal -->
+<div id="billingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-left">
+        <button onclick="closeBillingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl font-semibold cursor-pointer">&times;</button>
+        
+        <div class="text-center mb-5">
+            <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-500/20">Instant UPI Settlement</span>
+            <h2 class="text-2xl font-black text-white mt-2">Renew Clinic Subscription</h2>
+            <p class="text-xs text-slate-400 mt-1">₹4,999 / month • ReceptionistAI Autonomous Autopilot</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex flex-col items-center mb-5">
+            <div class="bg-white p-3 rounded-2xl shadow-inner mb-3">
+                <img id="upi-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dihsaan%40upi%26pn%3DReceptionistAI%26am%3D4999%26cu%3DINR%26tn%3DClinic%2520Autopilot%2520Plan" alt="Scan UPI QR" class="w-48 h-48 object-contain">
+            </div>
+            <p class="text-xs text-slate-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
+            <a id="upi-mobile-link" href="upi://pay?pa=ihsaan@upi&pn=ReceptionistAI&am=4999&cu=INR&tn=Clinic%20Autopilot%20Plan" class="mt-2 text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1">
+                <span>📱 Tap here to pay directly on mobile</span>
+            </a>
+        </div>
+
+        <form id="renewalForm" onsubmit="submitRenewalForm(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Enter 12-Digit UPI Transaction / UTR ID</label>
+                <input type="text" id="utr_number" required placeholder="e.g. 428901239845" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none placeholder-slate-600 font-mono">
+            </div>
+            <button type="submit" id="renew-btn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm shadow-lg shadow-emerald-500/20 cursor-pointer">
+                Verify UTR & Extend License (+30 Days)
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openBillingModal() {
+    document.getElementById('billingModal').classList.remove('hidden');
+}
+
+function closeBillingModal() {
+    document.getElementById('billingModal').classList.add('hidden');
+}
+
+async function submitRenewalForm(e) {
+    e.preventDefault();
+    const btn = document.getElementById('renew-btn');
+    const utr = document.getElementById('utr_number').value.trim();
+    
+    if (utr.length < 8) {
+        alert("Please enter a valid 12-digit UPI UTR number from your payment app.");
+        return;
+    }
+
+    btn.innerText = "Verifying Transaction...";
+    btn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('clinic_slug', 'dr-kurian-clinic');
+        formData.append('utr_number', utr);
+
+        const res = await fetch('/api/subscription/submit-payment', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert("🎉 " + data.message);
+            closeBillingModal();
+            window.location.reload();
+        } else {
+            alert("⚠️️ " + (data.detail || "Verification failed. Please check the UTR."));
+        }
+    } catch(err) {
+        alert("Server error processing verification.");
+    } finally {
+        btn.innerText = "Verify UTR & Extend License (+30 Days)";
+        btn.disabled = false;
+    }
+}
+</script>
+
 </body>
 </html>
