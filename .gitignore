@@ -12,3 +12,10 @@ venv/
 clinic.db
 clinic.db.bak*
 .DS_Store
+.env
+clinic.db
+whatsapp-bridge/auth_info_baileys/
+node_modules/
+__pycache__/
+*.pyc
+whatsapp-bridge/auth_info_baileys/
