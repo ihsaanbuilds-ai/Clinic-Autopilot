@@ -376,3 +376,69 @@ async def whatsapp_webhook_handler(request: Request):
 @doctor_router.post("/trigger-followups")
 def trigger_followups_endpoint(days_ago: int = 2):
     return dispatch_post_consultation_followups(days_ago)
+
+def handle_cancellation(sender_phone: str):
+    """
+    Atomically cancels the patient appointment, vacates the UNIQUE constraint slot,
+    and auto-promotes the next patient from the waitlist without holding write locks.
+    """
+    clean_phone = sender_phone.replace("whatsapp:", "").strip()
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    promoted_patient = None
+    try:
+        # 1. Fetch active appointment
+        c.execute("""
+            SELECT id, appointment_time, doctor_id 
+            FROM appointments 
+            WHERE (patient_phone = ? OR patient_phone = ?) AND status = 'confirmed'
+            ORDER BY id DESC LIMIT 1
+        """, (clean_phone, f"+{clean_phone}"))
+        appt = c.fetchone()
+        
+        if not appt:
+            return False, "You do not have any active confirmed appointment to cancel."
+
+        appt_id = appt["id"]
+        appt_time = appt["appointment_time"]
+        doc_id = appt["doctor_id"] if appt["doctor_id"] else 1
+
+        # 2. Mark existing record as cancelled to release the slot
+        c.execute("UPDATE appointments SET status = 'cancelled' WHERE id = ?", (appt_id,))
+
+        # 3. Parse date and time to search waitlist (format: YYYY-MM-DD HH:MM:SS)
+        parts = str(appt_time).split(" ")
+        pref_date = parts[0]
+        pref_time = parts[1][:5] if len(parts) > 1 else "10:00"
+
+        c.execute("""
+            SELECT id, patient_name, patient_phone 
+            FROM waitlist 
+            WHERE preferred_date = ? AND preferred_time = ? AND status = 'waiting' AND doctor_id = ?
+            ORDER BY created_at ASC LIMIT 1
+        """, (pref_date, pref_time, doc_id))
+        waiter = c.fetchone()
+
+        if waiter:
+            # Re-occupy slot cleanly with the promoted patient
+            c.execute("""
+                INSERT INTO appointments (patient_name, patient_phone, appointment_time, status, doctor_id)
+                VALUES (?, ?, ?, 'confirmed', ?)
+            """, (waiter["patient_name"], waiter["patient_phone"], appt_time, doc_id))
+            
+            c.execute("UPDATE waitlist SET status = 'promoted' WHERE id = ?", (waiter["id"],))
+            promoted_patient = dict(waiter)
+
+        conn.commit()
+        
+        reply_msg = "Your appointment has been successfully cancelled."
+        if promoted_patient:
+            reply_msg += f" Slot {pref_time} on {pref_date} was automatically assigned to waitlisted patient."
+        return True, reply_msg
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error in atomic handle_cancellation: {e}")
+        return False, "An error occurred while processing your cancellation. Please try again."
+    finally:
+        conn.close()

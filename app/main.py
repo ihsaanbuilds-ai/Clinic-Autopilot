@@ -1,4 +1,3 @@
-from app.evolution_router import evolution_router
 from app.voice_router import voice_router
 import os
 from fastapi import FastAPI
@@ -14,7 +13,6 @@ app = FastAPI(title="Dr. Kurian's Medical Clinic - Receptionist AI")
 app.include_router(doctor_router)
 app.include_router(dashboard_router)
 app.include_router(voice_router)
-app.include_router(evolution_router)
 
 # Mount Static UI
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
