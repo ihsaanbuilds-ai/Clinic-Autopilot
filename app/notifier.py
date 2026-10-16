@@ -1,36 +1,65 @@
 import os
+import time
 import logging
-from twilio.rest import Client
+import requests
 
 logger = logging.getLogger("clinic_notifier")
 
-ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+BRIDGE_SEND_URL = os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3000/send")
+BRIDGE_TIMEOUT = float(os.getenv("WHATSAPP_BRIDGE_TIMEOUT", "10"))
+BRIDGE_RETRIES = int(os.getenv("WHATSAPP_BRIDGE_RETRIES", "3"))
+RETRY_BACKOFF = 1.5
 
-def format_whatsapp_number(raw_phone: str) -> str:
-    phone = raw_phone.strip().replace(" ", "").replace("-", "")
-    if not phone.startswith("whatsapp:"):
-        if not phone.startswith("+"):
-            phone = f"+{phone}"
-        phone = f"whatsapp:{phone}"
-    return phone
 
 def send_whatsapp_message(to_phone: str, body: str) -> bool:
-    if not ACCOUNT_SID or not AUTH_TOKEN:
-        logger.warning("Twilio credentials not configured; logging message locally:")
-        logger.info(f"TO: {to_phone} | BODY:\n{body}")
+    """Send a WhatsApp message through the local Baileys bridge.
+
+    Retries transient failures (bridge reconnecting / socket restarting) with
+    exponential backoff. Returns True only when the bridge confirms dispatch.
+    """
+    clean_phone = to_phone.replace("whatsapp:", "").replace("+", "").strip()
+    if not clean_phone or not body:
+        logger.error("send_whatsapp_message called with empty phone or body")
         return False
 
-    try:
-        client = Client(ACCOUNT_SID, AUTH_TOKEN)
-        recipient = format_whatsapp_number(to_phone)
-        client.messages.create(
-            from_=TWILIO_NUMBER,
-            to=recipient,
-            body=body
-        )
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send outbound WhatsApp to {to_phone}: {e}")
-        return False
+    last_error = "unknown error"
+    for attempt in range(1, BRIDGE_RETRIES + 1):
+        retryable = True
+        try:
+            response = requests.post(
+                BRIDGE_SEND_URL,
+                json={"phone": clean_phone, "message": body},
+                timeout=BRIDGE_TIMEOUT,
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                data = {}
+
+            if response.ok and data.get("success"):
+                return True
+
+            last_error = data.get("error") or f"HTTP {response.status_code}"
+            retryable = bool(data.get("retryable", response.status_code >= 500))
+        except requests.RequestException as exc:
+            last_error = str(exc)
+            retryable = True
+
+        if attempt < BRIDGE_RETRIES and retryable:
+            sleep_for = RETRY_BACKOFF ** attempt
+            logger.warning(
+                "Bridge send failed (attempt %d/%d): %s — retrying in %.1fs",
+                attempt,
+                BRIDGE_RETRIES,
+                last_error,
+                sleep_for,
+            )
+            time.sleep(sleep_for)
+        else:
+            break
+
+    logger.error(
+        "Bridge failed to send after %d attempt(s): %s", BRIDGE_RETRIES, last_error
+    )
+    logger.info("UNDELIVERED -> +%s | BODY:\n%s", clean_phone, body)
+    return False

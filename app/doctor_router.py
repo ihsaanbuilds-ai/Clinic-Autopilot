@@ -410,6 +410,24 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
     if is_doctor(clean_phone) and msg_lower.split()[0] in ["briefing", "today", "schedule", "tomorrow", "cancel", "fill", "promote", "block", "leave"]:
         return handle_doctor_commands(msg_lower)
 
+    # 0.5. REMINDER CONFIRMATION HOOK (If patient replies 1 to a 24h reminder)
+    if msg_lower == "1":
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            SELECT id, appointment_time FROM appointments 
+            WHERE patient_phone = ? AND status = 'confirmed' 
+            ORDER BY appointment_time ASC LIMIT 1
+        """, (clean_phone,))
+        upcoming = c.fetchone()
+        conn.close()
+        if upcoming:
+            return (
+                f"✅ *Attendance Confirmed!* Thank you {profile_name}. "
+                f"Your appointment (#{upcoming["id"]} on {upcoming["appointment_time"]}) is confirmed with Dr. Kurian. "
+                f"We look forward to seeing you at MG Road, Kochi!"
+            )
+
     # 1. IMMEDIATE EMERGENCY TRIAGE (Always preempts even if bot is muted)
     if check_emergency_triage(msg_clean):
         log_staff_escalation(clean_phone, profile_name, f"Emergency Triage Triggered: {msg_clean}")

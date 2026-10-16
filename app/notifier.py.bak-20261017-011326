@@ -1,0 +1,26 @@
+import os
+import logging
+import requests
+
+logger = logging.getLogger("clinic_notifier")
+BRIDGE_SEND_URL = os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3000/send")
+
+def send_whatsapp_message(to_phone: str, body: str) -> bool:
+    clean_phone = to_phone.replace("whatsapp:", "").replace("+", "").strip()
+    try:
+        response = requests.post(
+            BRIDGE_SEND_URL,
+            json={"phone": clean_phone, "message": body},
+            timeout=10
+        )
+        data = response.json()
+        if data.get("success"):
+            return True
+        else:
+            logger.error(f"Bridge failed to send message: {data.get('error')}")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to communicate with local WhatsApp bridge at {BRIDGE_SEND_URL}: {e}")
+        # Fallback to local log if bridge is offline
+        logger.info(f"FALLBACK TO: +{clean_phone} | BODY:\n{body}")
+        return False
