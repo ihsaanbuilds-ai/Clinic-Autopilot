@@ -424,7 +424,7 @@ def handle_receptionist_ai(incoming_msg: str, sender_phone: str, profile_name: s
         if upcoming:
             return (
                 f"✅ *Attendance Confirmed!* Thank you {profile_name}. "
-                f"Your appointment (#{upcoming["id"]} on {upcoming["appointment_time"]}) is confirmed with Dr. Kurian. "
+                f"Your appointment (#{upcoming['id']} on {upcoming['appointment_time']}) is confirmed with Dr. Kurian. "
                 f"We look forward to seeing you at MG Road, Kochi!"
             )
 
