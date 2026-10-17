@@ -4,7 +4,8 @@ const {
     DisconnectReason, 
     fetchLatestBaileysVersion,
     Browsers,
-    delay
+    delay,
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
@@ -15,7 +16,14 @@ const app = express();
 app.use(express.json());
 
 const WEBHOOK_URL = 'https://clinic-autopilot.onrender.com/api/doctor/whatsapp-webhook';
+const VOICE_WEBHOOK_URL = 'https://clinic-autopilot.onrender.com/api/doctor/whatsapp-voice-webhook';
 const PORT = 3000;
+
+// ==========================================
+// 🛡️ STRICT TESTING WHITELIST
+// Only this exact number will trigger bot replies or receive outbound messages.
+// ==========================================
+const ALLOWED_TEST_PHONE = '919567826305';
 
 let globalSock = null;
 let isConnected = false;
@@ -55,11 +63,11 @@ async function startBot() {
                 isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                console.log(`⚠️ Connection dropped (code ${statusCode}). Auto-reconnecting: ${shouldReconnect}`);
+                console.log(`⚠️ Connection dropped. Auto-reconnecting: ${shouldReconnect}`);
                 if (shouldReconnect) {
                     setTimeout(startBot, 3000);
                 } else {
-                    console.log('❌ Session invalidated. Run "rm -rf auth_info_baileys" and scan again.');
+                    console.log('❌ Session invalidated.');
                 }
             } else if (connection === 'open') {
                 isConnected = true;
@@ -68,6 +76,7 @@ async function startBot() {
                 console.log('\n========================================');
                 console.log('✅ WhatsApp Bridge Connected & Live!');
                 console.log(`👤 Bridge Owner Number: +${cleanOwnerPhone}`);
+                console.log(`🔒 Test Mode Restricted Strictly To: +${ALLOWED_TEST_PHONE}`);
                 console.log('========================================\n');
                 try {
                     await sock.sendPresenceUpdate('available');
@@ -82,20 +91,65 @@ async function startBot() {
             if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') return;
 
             const remoteJid = msg.key.remoteJid;
+            
+            // Ignore group chats entirely
+            if (remoteJid.endsWith('@g.us')) return;
+
             let rawPhone = remoteJid.split('@')[0];
             if (msg.key.participant) {
                 rawPhone = msg.key.participant.split('@')[0];
             }
             const cleanPhone = rawPhone.replace(/\D/g, '');
 
+            // 🛡️ CRITICAL CHECK: Ignore ANY phone number not in your test whitelist
+            if (cleanPhone !== ALLOWED_TEST_PHONE) {
+                // Silently skip non-test contacts so they never get an AI reply
+                return;
+            }
+
+            
+            // Check for WhatsApp voice note / audio message
+            if (msg.message?.audioMessage) {
+                console.log(`🎙️ Received audio voice note from ${pushName} (+${cleanPhone})`);
+                try {
+                    const audioBuffer = await downloadMediaMessage(
+                        msg,
+                        "buffer",
+                        {},
+                        { logger: pino({ level: "silent" }), reuploadRequest: sock.updateMediaMessage }
+                    );
+
+                    const voicePayload = {
+                        phone: cleanPhone,
+                        name: pushName,
+                        audio_base64: audioBuffer.toString("base64"),
+                        mime_type: msg.message.audioMessage.mimetype || "audio/ogg"
+                    };
+
+                    const res = await axios.post(VOICE_WEBHOOK_URL, voicePayload, {
+                        headers: { "Content-Type": "application/json" },
+                        timeout: 45000
+                    });
+
+                    const replyText = res.data?.reply || "";
+                    if (replyText) {
+                        await sock.sendMessage(remoteJid, { text: replyText });
+                        console.log(`📤 Replied to voice note from ${pushName}: "${replyText.substring(0, 50).replace(/\n/g, " ")}..."`);
+                    }
+                } catch (audioErr) {
+                    console.error("❌ Error processing audio note:", audioErr.message);
+                }
+                return;
+            }
+
             const text = msg.message?.conversation || 
                          msg.message?.extendedTextMessage?.text || 
                          msg.message?.imageMessage?.caption || '';
-            const pushName = msg.pushName || 'Patient';
+            const pushName = msg.pushName || 'Friend';
 
             if (!text.trim()) return;
 
-            console.log(`📩 Inbound from ${pushName} (+${cleanPhone}): "${text}"`);
+            console.log(`📩 Whitelisted Inbound from ${pushName} (+${cleanPhone}): "${text}"`);
 
             try {
                 const payload = {
@@ -118,7 +172,7 @@ async function startBot() {
 
                 if (replyText) {
                     await sock.sendMessage(remoteJid, { text: replyText });
-                    console.log(`📤 Replied to ${pushName}: "${replyText.substring(0, 45).replace(/\n/g, ' ')}..."`);
+                    console.log(`📤 Replied to test user ${pushName}: "${replyText.substring(0, 45).replace(/\n/g, ' ')}..."`);
                 }
             } catch (err) {
                 console.error('❌ Webhook error:', err.message);
@@ -130,18 +184,28 @@ async function startBot() {
     }
 }
 
-// Helper: timeout wrapper for promises
 const withTimeout = (promise, ms) =>
     Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout')), ms))
     ]);
 
-// Rock-Solid Outbound Dispatcher
+// Outbound Dispatcher restricted to test phone
 app.post('/send', async (req, res) => {
     const { phone, message } = req.body;
     if (!phone || !message) {
         return res.status(400).json({ success: false, error: 'Missing phone or message' });
+    }
+
+    let cleanPhone = String(phone).replace(/\D/g, '');
+    if (cleanPhone.length === 10) {
+        cleanPhone = '91' + cleanPhone;
+    }
+
+    // 🛡️ CRITICAL OUTBOUND CHECK
+    if (cleanPhone !== ALLOWED_TEST_PHONE) {
+        console.log(`🚫 Blocked outbound attempt to non-whitelisted number: +${cleanPhone}`);
+        return res.status(403).json({ success: false, error: 'Number not whitelisted for testing' });
     }
 
     if (!globalSock || !isConnected) {
@@ -149,44 +213,26 @@ app.post('/send', async (req, res) => {
     }
 
     try {
-        let cleanPhone = String(phone).replace(/\D/g, '');
-        if (cleanPhone.length === 10) {
-            cleanPhone = '91' + cleanPhone;
-        }
-
-        const ownerId = globalSock.user?.id || '';
-        const ownerPhone = ownerId.split(':')[0].replace(/\D/g, '');
-
         let targetJid = `${cleanPhone}@s.whatsapp.net`;
-
-        if (ownerPhone && cleanPhone === ownerPhone) {
-            targetJid = globalSock.user.id;
-            console.log(`ℹ️ Outbound routed as Self-Chat note to host device: ${targetJid}`);
-        } else {
-            try {
-                // Verify existence with a fast 3-second timeout
-                const results = await withTimeout(globalSock.onWhatsApp(targetJid), 3000);
-                if (results && results.length > 0 && results[0].exists) {
-                    targetJid = results[0].jid;
-                }
-            } catch (e) {
-                // If timeout or failure, proceed with standard jid
+        try {
+            const results = await withTimeout(globalSock.onWhatsApp(targetJid), 3000);
+            if (results && results.length > 0 && results[0].exists) {
+                targetJid = results[0].jid;
             }
-        }
+        } catch (e) {}
 
         await delay(200);
         await globalSock.sendMessage(targetJid, { text: message });
-        console.log(`📤 Outbound successfully sent to ${targetJid}: "${message.substring(0, 40).replace(/\n/g, ' ')}..."`);
+        console.log(`📤 Outbound sent to +${cleanPhone}`);
         return res.json({ success: true, target: targetJid });
 
     } catch (err) {
-        console.error('❌ Outbound delivery error:', err?.message || err);
         return res.status(500).json({ success: false, error: err?.message || String(err) });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Bridge HTTP outbound server listening on port ${PORT}`);
+    console.log(`🚀 Bridge listening on port ${PORT}`);
 });
 
 startBot();
