@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from app import config
 from app.auth import verify_admin
 from app.billing_router import billing_router
+from app.exotel_router import exotel_router
 from app.dashboard_router import dashboard_router
 from app.database import get_sqlite_connection
 from app.doctor_router import doctor_router
@@ -38,6 +39,7 @@ app.include_router(doctor_router)
 app.include_router(dashboard_router)
 app.include_router(voice_router)
 app.include_router(billing_router)
+app.include_router(exotel_router)
 
 # Mount static UI
 if os.path.exists(STATIC_DIR):
