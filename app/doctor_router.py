@@ -5,6 +5,7 @@ Inbound messages arrive from the Baileys bridge as JSON and are dispatched here.
 Doctor-command routing is per doctor: any phone number that matches an active
 ``doctors`` row can run schedule/leave commands for their own calendar.
 """
+import logging
 import os
 import re
 import sqlite3
@@ -37,6 +38,7 @@ from app.followup_engine import (
 from app.auth import verify_admin
 
 doctor_router = APIRouter(prefix="/api/doctor", tags=["Doctor & Patient Portal"])
+logger = logging.getLogger("clinic_doctor_router")
 
 RAW_DOCTOR_PHONE = os.getenv("DOCTOR_PHONE", config.CLINIC_PHONE)
 DOCTOR_PHONE_DIGITS = re.sub(r"\D", "", RAW_DOCTOR_PHONE)[-10:]
