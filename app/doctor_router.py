@@ -890,8 +890,9 @@ async def trigger_followups(days_ago: int = 2):
 
 @doctor_router.post("/whatsapp-voice-webhook")
 async def handle_whatsapp_voice(request: Request):
-    import base64
-    from app.ai_agent import transcribe_and_process_voice
+    import os, base64, subprocess, tempfile
+    from app.sarvam_service import transcribe_audio_sarvam
+
     try:
         data = await request.json()
     except Exception:
@@ -900,34 +901,52 @@ async def handle_whatsapp_voice(request: Request):
     sender_phone = str(data.get("phone") or "").strip()
     sender_name = str(data.get("name") or "Patient").strip()
     audio_base64 = data.get("audio_base64")
-    mime_type = data.get("mime_type") or "audio/ogg; codecs=opus"
 
     if not sender_phone or not audio_base64:
         return {"status": "ignored", "detail": "missing phone or audio data"}
 
     try:
         audio_bytes = base64.b64decode(audio_base64)
-        clean_mime = mime_type.split(";")[0].strip()
-        transcribed_text = transcribe_and_process_voice(audio_bytes, mime_type=clean_mime)
+        with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as in_f:
+            in_f.write(audio_bytes)
+            in_path = in_f.name
+
+        wav_path = in_path + ".wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", in_path, "-ar", "16000", "-ac", "1", wav_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        with open(wav_path, "rb") as wf:
+            clean_wav_bytes = wf.read()
+
+        try:
+            os.remove(in_path)
+            os.remove(wav_path)
+        except OSError:
+            pass
+
+        transcribed_text = transcribe_audio_sarvam(clean_wav_bytes, filename="voice.wav")
         if not transcribed_text:
             return {
                 "status": "success",
-                "reply": "I received your voice note, but I could not clearly hear the audio. Could you please send your request as text or try re-recording?"
+                "reply": "I received your voice note, but could not catch the words clearly. Could you please text or re-record?"
             }
 
+        # handle_receptionist_ai is defined right in this file
         reply_text = handle_receptionist_ai(
             incoming_msg=transcribed_text,
             sender_phone=sender_phone,
             profile_name=sender_name
         )
+
+        formatted_reply = "Heard: " + transcribed_text + "\n\n" + reply_text
         return {
             "status": "success",
             "transcription": transcribed_text,
-            "reply": f"🎙️ *Heard*: \"{transcribed_text}\"\n\n{reply_text}"
+            "reply": formatted_reply
         }
     except Exception as e:
         logger.error(f"error processing whatsapp voice webhook: {e}")
-        return {
-            "status": "error",
-            "reply": "Thank you for contacting the clinic. We could not process your voice note at this moment. Please reply with text."
-        }
+        return {"status": "error", "reply": "Sorry, I had trouble processing that voice note."}

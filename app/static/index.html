@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReceptionistAI Pro | Dr. Kurian's Medical Clinic</title>
+    <title>ReceptionistAI Pro | CityCare Multispeciality Clinic</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +31,7 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-bold text-white tracking-tight">Dr. Kurian's Clinic</h1>
+                        <h1 class="text-xl font-bold text-white tracking-tight">CityCare Clinic</h1>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">SaaS Live</span>
                     </div>
                     <p class="text-xs text-slate-400">ReceptionistAI Autonomous Reception</p>
@@ -217,9 +217,30 @@
         }
 
         
+        function getAdminToken() {
+            let token = localStorage.getItem('adminSecret');
+            if (!token) {
+                token = window.prompt('Enter the admin secret to access this dashboard:');
+                if (token) localStorage.setItem('adminSecret', token);
+            }
+            return token || '';
+        }
+
+        // fetch() wrapper that attaches the admin secret and clears a rejected one.
+        async function apiFetch(url, options) {
+            options = options || {};
+            options.headers = Object.assign({ 'X-Admin-Secret': getAdminToken() }, options.headers || {});
+            const res = await fetch(url, options);
+            if (res.status === 401 || res.status === 503) {
+                localStorage.removeItem('adminSecret');
+                alert('Admin authentication required. Please reload and enter the correct secret.');
+            }
+            return res;
+        }
+
         async function setApptStatus(apptId, status) {
             try {
-                const res = await fetch(`/api/appointments/${apptId}/status`, {
+                const res = await apiFetch(`/api/appointments/${apptId}/status`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: status })
@@ -237,7 +258,7 @@
         async function fetchMetrics() {
             const dateInput = document.getElementById('target_date').value;
             try {
-                const res = await fetch(`/api/dashboard/metrics?target_date=${dateInput}`);
+                const res = await apiFetch(`/api/dashboard/metrics?target_date=${dateInput}`);
                 if (!res.ok) return;
                 const data = await res.json();
 
@@ -288,7 +309,7 @@
 
         async function loadLicenseStatus() {
             try {
-                const res = await fetch('/api/subscription/status');
+                const res = await apiFetch('/api/subscription/status');
                 if (!res.ok) return;
                 const data = await res.json();
                 document.getElementById('license-display').innerText = `Expires in: ${data.days_remaining} days`;
@@ -312,10 +333,10 @@
 
             try {
                 const formData = new FormData();
-                formData.append('clinic_slug', 'dr-kurian-clinic');
+                formData.append('clinic_slug', 'citycare-clinic');
                 formData.append('utr_number', utr);
 
-                const res = await fetch('/api/subscription/submit-payment', {
+                const res = await apiFetch('/api/subscription/submit-payment', {
                     method: 'POST',
                     body: formData
                 });
