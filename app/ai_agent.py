@@ -1,13 +1,21 @@
+"""Gemini-backed extras: Multilingual WhatsApp voice-note transcription + Receptionist AI.
+
+Languages supported: English, Hindi, Tamil, Malayalam, Marathi (both native script and Romanized/chat script).
+Medical guardrails are strictly enforced: no diagnosis, no prescriptions, immediate emergency escalation.
+"""
 import os
 import re
 import time
 import logging
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from google import genai
 from google.genai import types
+
+from app import config
 
 logger = logging.getLogger("clinic_ai")
 
@@ -20,94 +28,151 @@ if api_key:
     except Exception as e:
         logger.error(f"failed to initialize gemini client: {e}")
 else:
-    logger.warning("GEMINI_API_KEY is not set in environment or .env file.")
+    logger.warning("GEMINI_API_KEY is not set; voice notes and AI Q&A are disabled.")
 
-# The active model supported by your key
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
-CLINIC_SYSTEM_INSTRUCTION = """
-You are the AI Front Desk Receptionist for Dr. Kurian's Medical Clinic located in MG Road, Kochi, Kerala.
+CLINIC_SYSTEM_INSTRUCTION = f"""
+You are the warm, polite, and attentive front desk receptionist at {config.CLINIC_NAME}, located at {config.CLINIC_ADDRESS}.
 
-Clinic facts:
-- Doctor: Dr. Kurian, MBBS, MD (General Physician & Internal Medicine). Over 15 years experience.
-- Location: 2nd Floor, Apex Health Centre, MG Road, Central Junction, Kochi.
-- Timings: Monday to Saturday, 9:00 AM to 1:00 PM and 2:00 PM to 6:00 PM. Closed on Sundays.
-- Consultation fee: ₹500 for general consultation. Follow-up within 7 days is ₹300.
-- Payment modes: UPI (GPay, PhonePe, Paytm), cash, and debit/credit cards at the clinic counter.
-- Insurance: The clinic provides formal printed bills with diagnosis and registration numbers for insurance reimbursement claims. Direct cashless facility depends on the patient's TPA/policy network.
-- Facilities: Lift/elevator access available, two-wheeler and four-wheeler basement parking available at Apex Health Centre. Wheelchair friendly.
-- Pediatric policy: Children above 3 years are seen for general illnesses (fever, cold, cough). For neonates or specialized pediatric conditions, recommend consulting a dedicated pediatrician.
+Clinic details:
+- Primary doctor: {config.DOCTOR_NAME}
+- Working hours: {config.CLINIC_HOURS_TEXT}
+- Consultation fee: ₹{config.CONSULTATION_FEE}. Follow-up within 7 days is ₹{config.FOLLOWUP_FEE}.
+- Building amenities: Wheelchair access available, lift/elevator present, basement parking for two-wheelers and cars.
+- Payment modes: UPI (GPay, PhonePe, Paytm), cash, and cards at counter.
 
-Guardrails:
-1. Strict medical boundary: NEVER diagnose conditions, recommend specific medicines, or suggest dosages. Always advise booking an in-person consultation with Dr. Kurian.
-2. Emergencies: For severe chest pain, breathing difficulty, or unconsciousness, tell them to call 108 or 112 immediately.
-3. Tone: Warm, helpful, professional, and concise (under 3 sentences whenever possible). Use WhatsApp friendly formatting with bolding where appropriate. Always guide them to check open slots or book an appointment.
+Language & Receptionist Persona Rules:
+1. Multilingual Fluency: You speak fluent English, Hindi, Tamil, Malayalam, and Marathi.
+2. Mirror the Patient:
+   - Always reply in the exact language the patient used.
+   - If the patient types in Romanized script (Hinglish, Manglish, Tanglish, Roman Marathi), reply in natural conversational Romanized script.
+   - If the patient types in native script (Devanagari, Tamil, Malayalam), reply in that native script.
+   - For English queries, respond in warm Indian English.
+3. Natural Receptionist Etiquette:
+   - Act like a real person at the clinic counter taking a call or chat.
+   - Be empathetic, welcoming, and reassuring.
+   - Keep replies short, conversational, and helpful (2 to 4 sentences max). Never sound like an automated robotic IVR menu.
+   - Do not ask more than one question at a time. Guide the patient smoothly to pick a date or slot.
+4. Strict Medical Boundary:
+   - If a patient asks for a prescription, medicine recommendation, dosage, or medical opinion, decline gently in the language they used.
+   - Explain that only the doctor can assess their symptoms and prescribe treatment safely during an in-person visit.
+   - Suggest checking open appointment slots immediately.
+5. Emergency Triage:
+   - If a patient mentions severe chest pain, breathing difficulty, sudden paralysis, severe bleeding, or unconsciousness, tell them urgently to call {config.EMERGENCY_NUMBERS} or rush to the nearest emergency room.
 """
 
-def _call_gemini_with_retry(contents, system_instruction=None, max_retries=2):
+MULTILINGUAL_PRESCRIPTION_NOTICES = {
+    "en": (
+        "I understand you are feeling unwell, but as the clinic receptionist, I cannot prescribe medicines or suggest dosages. "
+        f"Only {config.DOCTOR_NAME} can evaluate you safely. Would you like to book an appointment to see the doctor today or tomorrow?"
+    ),
+    "ml": (
+        "സുഖമില്ലാത്തതിൽ വിഷമമുണ്ട്. എന്നാൽ റിസപ്ഷനിസ്റ്റ് ആയതുകൊണ്ട് എനിക്ക് മരുന്നുകൾ നിർദേശിക്കാൻ കഴിയില്ല. "
+        f"{config.DOCTOR_NAME} നേരിട്ട് കണ്ട് പരിശോധിച്ച ശേഷം മാത്രമേ മരുന്ന് നൽകാൻ സാധിക്കൂ. നാളത്തേക്കോ മറ്റോ ഒരു അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യണോ?"
+    ),
+    "hi": (
+        "आपकी तबियत ठीक नहीं है यह सुनकर दुख हुआ, लेकिन क्लिनिक रिसेप्शनिस्ट होने के नाते मैं आपको दवाइयां या खुराक नहीं बता सकती। "
+        f"{config.DOCTOR_NAME} से मिलकर जांच करवाना ही सुरक्षित रहेगा। क्या मैं आपके लिए आज या कल का अपॉइंटमेंट बुक कर दूं?"
+    ),
+    "ta": (
+        "உங்களுக்கு உடல்நிலை சரியில்லை என்பதை புரிந்து கொள்ள முடிகிறது, ஆனால் கிளினிக் வரவேற்பாளராக என்னால் மருந்துகளை பரிந்துரைக்க முடியாது. "
+        f"{config.DOCTOR_NAME} நேரில் பார்த்து பரிசோதித்த பின்னரே மருந்து தர முடியும். உங்களுக்கு இன்றோ அல்லது நாளைக்கோ அப்பாயின்ட்மென்ட் புக் செய்யவா?"
+    ),
+    "mr": (
+        "तुमची तब्येत बरी नाही हे ऐकून वाईट वाटले, पण क्लिनिक रिसेप्शनिस्ट म्हणून मी औषधे लिहून देऊ शकत नाही. "
+        f"{config.DOCTOR_NAME} कडे प्रत्यक्ष तपासणी करून घेणेच योग्य ठरेल. मी तुमच्यासाठी आज किंवा उद्याची अपॉइंटमेंट बुक करू का?"
+    )
+}
+
+PRESCRIPTION_REGEX = re.compile(
+    r"\b(prescribe|prescription|medicine|medicines|tablet|tablets|syrup|antibiotic|antibiotics|dosage|dose|"
+    r"marunnu|marunnukal|davai|dawa|goli|mathirai|aushadh|aushadhi)\b",
+    re.IGNORECASE
+)
+
+
+def _call_gemini_with_retry(contents, system_instruction=None, max_retries=3):
+    if not client:
+        return None
     for attempt in range(max_retries + 1):
         try:
-            config = types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.3,
-                max_output_tokens=300
-            ) if system_instruction else types.GenerateContentConfig(temperature=0.2)
-
+            cfg = (
+                types.GenerateContentConfig(system_instruction=system_instruction)
+                if system_instruction
+                else None
+            )
             response = client.models.generate_content(
                 model=MODEL_NAME,
                 contents=contents,
-                config=config
+                config=cfg,
             )
             if response and response.text:
                 return response.text.strip()
         except Exception as e:
-            err_str = str(e)
-            if ("503" in err_str or "429" in err_str) and attempt < max_retries:
-                time.sleep(2 * (attempt + 1))
-                continue
-            logger.error(f"gemini error: {e}")
-            break
+            err_msg = str(e)
+            logger.warning(f"gemini call failed (attempt {attempt + 1}/{max_retries + 1}): {err_msg}")
+            if attempt < max_retries:
+                # If rate-limited (429), back off appropriately
+                sleep_sec = 2.5 * (attempt + 1) if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg else 0.8 * (attempt + 1)
+                time.sleep(sleep_sec)
     return None
 
-def answer_clinic_query(user_message: str, patient_name: str = "Patient") -> str:
-    msg_lower = user_message.lower()
 
-    # deterministic safety guardrail for prescriptions and medical advice
-    if re.search(r"\b(prescribe|prescription|medicine|antibiotic|antibiotics|dosage|diagnose|fever medicine|painkiller)\b", msg_lower):
-        return (
-            "⚠️ *Medical Notice*:\n"
-            "As an AI clinic assistant, I cannot diagnose medical conditions or prescribe medications.\n\n"
-            "Please book an in-person consultation with Dr. Kurian so you can be thoroughly evaluated. "
-            "Reply *'Available slots tomorrow'* to schedule an appointment."
-        )
-
+def transcribe_voice_note(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str | None:
+    """Transcribes patient voice notes in English, Malayalam, Tamil, Hindi, Marathi, etc."""
     if not client:
-        return "I am Dr. Kurian's clinic assistant. How can I assist you with your appointment or visit today?"
+        logger.warning("gemini client unavailable for transcription")
+        return None
 
-    reply = _call_gemini_with_retry(user_message, CLINIC_SYSTEM_INSTRUCTION)
-    if reply:
-        return reply
-
-    return (
-        "I can help answer questions regarding Dr. Kurian's clinic timings, parking, consultation fees, or booking an appointment. "
-        "Reply *'Available slots tomorrow'* to check open timings."
+    instruction = (
+        "Transcribe this clinic patient's voice message accurately. "
+        "The audio may be in English, Malayalam, Tamil, Hindi, Marathi, or code-mixed Indian English. "
+        "Output ONLY the exact spoken transcription text. Do not add any commentary, notes, or explanations."
     )
 
-def transcribe_and_process_voice(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
-    if not client:
-        return ""
     try:
-        prompt = (
-            "Listen to this patient's WhatsApp voice message carefully. "
-            "Transcribe exactly what they said into text. "
-            "Output only the transcribed text, nothing else."
+        part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+        return _call_gemini_with_retry(
+            contents=[part, "Transcribe the audio accurately."],
+            system_instruction=instruction,
         )
-        contents = [
-            types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
-            prompt
-        ]
-        text = _call_gemini_with_retry(contents)
-        return text or ""
     except Exception as e:
-        logger.error(f"gemini voice transcription error: {e}")
-        return ""
+        logger.error(f"voice note transcription failed: {e}")
+        return None
+
+
+def answer_clinic_query(patient_query: str, doctor_name: str = None) -> str:
+    """Answers patient queries conversationally as an empathetic multilingual clinic receptionist."""
+    # Check for prescription requests
+    if PRESCRIPTION_REGEX.search(patient_query):
+        # Quick language script heuristic for refusal
+        if any('\u0D00' <= char <= '\u0D7F' for char in patient_query):
+            return MULTILINGUAL_PRESCRIPTION_NOTICES["ml"]
+        elif any('\u0B80' <= char <= '\u0BFF' for char in patient_query):
+            return MULTILINGUAL_PRESCRIPTION_NOTICES["ta"]
+        elif any('\u0900' <= char <= '\u097F' for char in patient_query):
+            if any(w in patient_query.lower() for w in ["aushadh", "aahe", "karu", "kay"]):
+                return MULTILINGUAL_PRESCRIPTION_NOTICES["mr"]
+            return MULTILINGUAL_PRESCRIPTION_NOTICES["hi"]
+        elif any(w in patient_query.lower() for w in ["marunnu", "tharaamo", "kazhikkam"]):
+            return "Kshemikkanam, clinic receptionist aaya enikku marunnu nirdheshikkan kazhiyilla. Doctorodu nerittu samsaarikkaan oru appointment edukkaamo?"
+        elif any(w in patient_query.lower() for w in ["dawa", "goli", "batao", "de do"]):
+            return "Mujhe khed hai, par receptionist hone ke naate main koi dawa suggest nahi kar sakti. Doctor se consult karne ke liye kya main slot check karu?"
+        return MULTILINGUAL_PRESCRIPTION_NOTICES["en"]
+
+    effective_instruction = CLINIC_SYSTEM_INSTRUCTION
+    if doctor_name:
+        effective_instruction += f"\nNote: The patient is inquiring with or regarding {doctor_name}."
+
+    prompt = f"Patient asks: \"{patient_query}\"\n\nReply warmly and helpfully as the receptionist in the patient's language and style."
+    response = _call_gemini_with_retry(contents=prompt, system_instruction=effective_instruction)
+
+    if response:
+        return response
+
+    return (
+        f"Hello! This is the front desk at {config.CLINIC_NAME}. "
+        f"Dr. Kurian is available for consultations. "
+        "Would you like to check open slots for today or tomorrow?"
+    )
