@@ -19,3 +19,4 @@ node_modules/
 __pycache__/
 *.pyc
 whatsapp-bridge/auth_info_baileys/
+whatsapp-bridge/auth_info_baileys/
