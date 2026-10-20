@@ -35,9 +35,11 @@ async def exotel_incoming_call(request: Request):
     if audio_bytes:
         audio_cache[audio_id] = audio_bytes
         audio_url = f"https://clinic-autopilot.onrender.com/api/voice/exotel/audio/{audio_id}.wav"
-        return PlainTextResponse(audio_url)
-    
-    return PlainTextResponse(greeting)
+        xml_resp = f'''<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n    <Play>{audio_url}</Play>\n</Response>'''
+        return Response(content=xml_resp, media_type="application/xml")
+
+    xml_fallback = f'''<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n    <Say>{greeting}</Say>\n</Response>'''
+    return Response(content=xml_fallback, media_type="application/xml")
 
 @exotel_router.api_route("/process-response", methods=["GET", "POST"])
 async def exotel_process_response(request: Request):
@@ -85,6 +87,8 @@ async def exotel_process_response(request: Request):
     if audio_bytes:
         audio_cache[audio_id] = audio_bytes
         audio_url = f"https://clinic-autopilot.onrender.com/api/voice/exotel/audio/{audio_id}.wav"
-        return PlainTextResponse(audio_url)
+        xml_resp = f'''<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n    <Play>{audio_url}</Play>\n</Response>'''
+        return Response(content=xml_resp, media_type="application/xml")
 
-    return PlainTextResponse(reply_text)
+    xml_fallback = f'''<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n    <Say>{greeting}</Say>\n</Response>'''
+    return Response(content=xml_fallback, media_type="application/xml")
