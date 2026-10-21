@@ -7,7 +7,7 @@ Changes
 -------
 1. ``appointments`` — drops the global UNIQUE(appointment_time) constraint that
    made it impossible for two doctors to share a time slot; enforces
-   UNIQUE(doctor_id, appointment_time) instead.
+   -- partial index below instead.
 2. ``blocked_dates`` — adds ``doctor_id`` so leave blocks one doctor, not the
    whole clinic.
 3. ``staff_escalations`` — adds ``resolved_at`` for a full audit trail.
@@ -58,7 +58,7 @@ def _rebuild_appointments(c: sqlite3.Cursor):
             opt_out INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             doctor_id INTEGER DEFAULT 1,
-            UNIQUE(doctor_id, appointment_time)
+            -- partial index below
         )
     """)
     c.execute("""
@@ -164,10 +164,34 @@ def _seed_tenant(c: sqlite3.Cursor):
 
 
 def run():
+    import sqlite3
     conn = sqlite3.connect(DB_PATH, timeout=10.0)
     c = conn.cursor()
     try:
         c.execute("PRAGMA foreign_keys = OFF")
+        
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS doctor_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doctor_id INTEGER NOT NULL,
+                day_of_week INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                slot_duration_minutes INTEGER DEFAULT 30,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (doctor_id) REFERENCES doctors(id),
+                UNIQUE(doctor_id, day_of_week, start_time)
+            )
+        ''')
+
+        c.execute("DROP INDEX IF EXISTS ux_appointments_doctor_slot")
+        c.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_appointments_doctor_slot
+            ON appointments(doctor_id, appointment_time)
+            WHERE status IN ('confirmed', 'completed', 'arrived')
+        ''')
+
         if _appointments_has_global_unique_time(c):
             _rebuild_appointments(c)
         _add_column_if_missing(c, "appointments", "doctor_name", "TEXT")
@@ -177,6 +201,15 @@ def run():
         _reconcile_post_consultations(c)
         _reconcile_patient_sessions(c)
         _seed_tenant(c)
+
+        # Seed 12 standard shifts (2 doctors x Mon-Sat)
+        for doc_id in (1, 2):
+            for day in range(6):
+                c.execute('''
+                    INSERT OR IGNORE INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, slot_duration_minutes, is_active)
+                    VALUES (?, ?, '09:00', '17:00', 30, 1)
+                ''', (doc_id, day))
+
         conn.commit()
         print("✅ Migration v2 (Mumbai multi-doctor template) applied.")
     except Exception:
@@ -184,7 +217,6 @@ def run():
         raise
     finally:
         conn.close()
-
 
 if __name__ == "__main__":
     run()

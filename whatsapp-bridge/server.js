@@ -15,8 +15,9 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-const WEBHOOK_URL = 'https://clinic-autopilot.onrender.com/api/doctor/whatsapp-webhook';
-const VOICE_WEBHOOK_URL = 'https://clinic-autopilot.onrender.com/api/doctor/whatsapp-voice-webhook';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/doctor/whatsapp-webhook';
+const VOICE_WEBHOOK_URL = process.env.VOICE_WEBHOOK_URL || 'http://127.0.0.1:8001/api/doctor/whatsapp-voice-webhook';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'prod_shared_secret_clinic_autopilot_2026';
 const PORT = 3000;
 
 // ==========================================
@@ -127,7 +128,7 @@ async function startBot() {
                     };
 
                     const res = await axios.post(VOICE_WEBHOOK_URL, voicePayload, {
-                        headers: { "Content-Type": "application/json" },
+                        headers: { "Content-Type": "application/json", "X-Webhook-Secret": WEBHOOK_SECRET },
                         timeout: 45000
                     });
 
@@ -159,7 +160,7 @@ async function startBot() {
                 };
 
                 const res = await axios.post(WEBHOOK_URL, payload, {
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-Webhook-Secret': WEBHOOK_SECRET },
                     timeout: 30000
                 });
 

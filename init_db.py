@@ -11,12 +11,10 @@ DB_PATH = os.getenv("CLINIC_DB_PATH") or os.path.join(
     os.path.dirname(__file__), "clinic.db"
 )
 
-
 def init_all():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
     c = conn.cursor()
 
-    # 1. Clinics (tenant) — one row per onboarded clinic.
     c.execute("""
         CREATE TABLE IF NOT EXISTS clinics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +23,6 @@ def init_all():
         )
     """)
 
-    # 2. Doctors.
     c.execute("""
         CREATE TABLE IF NOT EXISTS doctors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +34,21 @@ def init_all():
         )
     """)
 
-    # 3. Appointments — a slot is unique per doctor, not globally.
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS doctor_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            slot_duration_minutes INTEGER DEFAULT 30,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (doctor_id) REFERENCES doctors(id),
+            UNIQUE(doctor_id, day_of_week, start_time)
+        )
+    """)
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,12 +61,16 @@ def init_all():
             reminder_2h_sent INTEGER DEFAULT 0,
             opt_out INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            doctor_id INTEGER DEFAULT 1,
-            UNIQUE(doctor_id, appointment_time)
+            doctor_id INTEGER DEFAULT 1
         )
     """)
 
-    # 4. Blocked dates — per doctor.
+    c.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_appointments_doctor_slot
+        ON appointments(doctor_id, appointment_time)
+        WHERE status IN ('confirmed', 'completed', 'arrived')
+    """)
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS blocked_dates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +82,6 @@ def init_all():
         )
     """)
 
-    # 5. Waitlist.
     c.execute("""
         CREATE TABLE IF NOT EXISTS waitlist (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,7 +95,6 @@ def init_all():
         )
     """)
 
-    # 6. Patient conversation sessions.
     c.execute("""
         CREATE TABLE IF NOT EXISTS patient_sessions (
             phone TEXT PRIMARY KEY,
@@ -92,7 +105,6 @@ def init_all():
         )
     """)
 
-    # 7. Staff escalations (human takeover + emergency log).
     c.execute("""
         CREATE TABLE IF NOT EXISTS staff_escalations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +117,6 @@ def init_all():
         )
     """)
 
-    # 8. Post-consultation follow-ups / review funnel.
     c.execute("""
         CREATE TABLE IF NOT EXISTS post_consultations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,7 +132,6 @@ def init_all():
         )
     """)
 
-    # 9. Payments.
     c.execute("""
         CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,7 +145,13 @@ def init_all():
         )
     """)
 
-    # 10. Clinic licence / subscription.
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS payment_utrs (
+            utr_number TEXT PRIMARY KEY,
+            submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS clinic_license (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,7 +164,6 @@ def init_all():
         )
     """)
 
-    # --- Seed data -------------------------------------------------------
     c.execute("""
         INSERT OR IGNORE INTO clinics (id, name, phone_number_id)
         VALUES (1, 'CityCare Multispeciality Clinic', NULL)
@@ -170,7 +185,6 @@ def init_all():
     conn.commit()
     conn.close()
     print("✅ Canonical schema applied successfully.")
-
 
 if __name__ == "__main__":
     init_all()

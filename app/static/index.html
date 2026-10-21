@@ -218,24 +218,13 @@
 
         
         function getAdminToken() {
-            let token = localStorage.getItem('adminSecret');
-            if (!token) {
-                token = window.prompt('Enter the admin secret to access this dashboard:');
-                if (token) localStorage.setItem('adminSecret', token);
-            }
-            return token || '';
+            return '';
         }
 
         // fetch() wrapper that attaches the admin secret and clears a rejected one.
         async function apiFetch(url, options) {
             options = options || {};
-            options.headers = Object.assign({ 'X-Admin-Secret': getAdminToken() }, options.headers || {});
-            const res = await fetch(url, options);
-            if (res.status === 401 || res.status === 503) {
-                localStorage.removeItem('adminSecret');
-                alert('Admin authentication required. Please reload and enter the correct secret.');
-            }
-            return res;
+            return await fetch(url, options);
         }
 
         async function setApptStatus(apptId, status) {

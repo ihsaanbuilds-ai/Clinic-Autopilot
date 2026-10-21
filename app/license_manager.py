@@ -2,7 +2,10 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "clinic.db")
+try:
+    from app.config import DB_PATH
+except ImportError:
+    DB_PATH = os.getenv("CLINIC_DB_PATH") or os.path.join(os.path.dirname(os.path.dirname(__file__)), "clinic.db")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -59,6 +62,13 @@ def renew_subscription(days: int = 30, clinic_slug: str = "dr-kurian-clinic") ->
         SET active = 1, valid_until = ? 
         WHERE clinic_slug = ?
     """, (new_expiry_str, clinic_slug))
+    if c.rowcount == 0:
+        c.execute("""
+            INSERT INTO clinic_license (clinic_slug, plan_name, price_inr, active, valid_until)
+            VALUES (?, 'Monthly Pro', 4999, 1, ?)
+        """, (clinic_slug, new_expiry_str))
+    if c.rowcount == 0:
+        c.execute("INSERT INTO clinic_license (clinic_slug, plan_name, price_inr, active, valid_until) VALUES (?, 'Monthly Pro', 4999, 1, ?)", (clinic_slug, new_expiry_str))
     conn.commit()
     conn.close()
 
