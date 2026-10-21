@@ -20,3 +20,5 @@ __pycache__/
 *.pyc
 whatsapp-bridge/auth_info_baileys/
 whatsapp-bridge/auth_info_baileys/
+node_modules/
+whatsapp-bridge/node_modules/
